@@ -2,6 +2,14 @@
 import { useState } from "react";
 
 const API = "http://localhost:5020";
+
+const authHeaders = (): HeadersInit => {
+  const token = typeof window !== "undefined" ? localStorage.getItem("authToken") : null;
+  const headers: Record<string, string> = { Accept: "application/json" };
+  if (token) headers.Authorization = `Bearer ${token}`;
+  return headers;
+};
+
 const parseJsonSafe = async (res: Response) => {
   const text = await res.text();
   if (!text) return null;
@@ -17,7 +25,9 @@ export default function ReportsPage() {
   const [out, setOut] = useState("");
 
   const financial = async () => {
-    const res = await fetch(`${API}/api/reports/financial?type=${encodeURIComponent(type)}`);
+    const res = await fetch(`${API}/api/reports/financial?type=${encodeURIComponent(type)}`, {
+      headers: authHeaders(),
+    });
     const data = await parseJsonSafe(res);
     setOut(JSON.stringify(data, null, 2));
   };
@@ -35,7 +45,9 @@ export default function ReportsPage() {
   };
 
   const adminFinancial = async () => {
-    const res = await fetch(`${API}/api/admin/financial-reports/${encodeURIComponent(type)}`);
+    const res = await fetch(`${API}/api/admin/financial-reports/${encodeURIComponent(type)}`, {
+      headers: authHeaders(),
+    });
     const data = await parseJsonSafe(res);
     setOut(JSON.stringify(data, null, 2));
   };
