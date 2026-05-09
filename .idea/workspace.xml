@@ -42,7 +42,7 @@
 }</component>
   <component name="GithubPullRequestsUISettings">{
   &quot;selectedUrlAndAccountId&quot;: {
-    &quot;url&quot;: &quot;https://github.com/Vechile-Part/Vechile-Parts-Frontend.git&quot;,
+    &quot;url&quot;: &quot;https://github.com/Vehicle-Part/Vehicle-Parts-Frontend.git&quot;,
     &quot;accountId&quot;: &quot;dcb3c70c-e147-4c02-af36-4ac50604035b&quot;
   }
 }</component>
@@ -67,7 +67,7 @@
     &quot;node.js.selected.package.eslint&quot;: &quot;(autodetect)&quot;,
     &quot;node.js.selected.package.tslint&quot;: &quot;(autodetect)&quot;,
     &quot;nodejs_package_manager_path&quot;: &quot;npm&quot;,
-    &quot;ts.external.directory.path&quot;: &quot;/Users/dashmashrestha/RiderProjects/Vechile-Parts-Frontend/node_modules/typescript/lib&quot;,
+    &quot;ts.external.directory.path&quot;: &quot;/Users/dashmashrestha/RiderProjects/Vehicle-Parts-Frontend/node_modules/typescript/lib&quot;,
     &quot;vue.rearranger.settings.migration&quot;: &quot;true&quot;
   }
 }</component>
