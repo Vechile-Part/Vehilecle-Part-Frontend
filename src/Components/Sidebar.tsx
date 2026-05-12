@@ -1,8 +1,15 @@
+"use client";
+
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { MdDashboard, MdInventory, MdPeople, MdPointOfSale, MdCalendarToday, MdBarChart, MdSettings, MdHelp, MdLogout } from "react-icons/md";
 import { FaUserFriends } from "react-icons/fa";
 
 function Sidebar() {
+    const pathname = usePathname();
+    const isActive = (paths: string[]) =>
+        paths.some((path) => pathname === path || pathname.startsWith(`${path}/`));
+
     return (
         <aside className="sidebar">
             {/* Warehouse Badge */}
@@ -22,28 +29,28 @@ function Sidebar() {
 
             {/* Nav Items */}
             <nav className="sidebar-nav">
-                <Link href="/dashboard" className="sidebar-item">
+                <Link href="/dashboard" className={`sidebar-item ${isActive(["/dashboard"]) ? "active" : ""}`}>
                     <MdDashboard size={16} /> Dashboard
                 </Link>
-                <Link href="/inventory" className="sidebar-item">
+                <Link href="/inventory" className={`sidebar-item ${isActive(["/inventory"]) ? "active" : ""}`}>
                     <MdInventory size={16} /> Inventory
                 </Link>
-                <Link href="/staff" className="sidebar-item">
+                <Link href="/staff" className={`sidebar-item ${isActive(["/staff", "/admin/staff"]) ? "active" : ""}`}>
                     <MdPeople size={16} /> Staff Management
                 </Link>
-                <Link href="/pos" className="sidebar-item">
+                <Link href="/pos" className={`sidebar-item ${isActive(["/pos", "/admin/purchase-invoices"]) ? "active" : ""}`}>
                     <MdPointOfSale size={16} /> Sales & POS
                 </Link>
-                <Link href="/customers" className="sidebar-item">
+                <Link href="/customers" className={`sidebar-item ${isActive(["/customers", "/staff/customers"]) ? "active" : ""}`}>
                     <FaUserFriends size={16} /> Customer List
                 </Link>
-                <Link href="/appointments" className="sidebar-item active">
+                <Link href="/appointments" className={`sidebar-item ${isActive(["/appointments", "/customer/appointments"]) ? "active" : ""}`}>
                     <MdCalendarToday size={16} /> Appointment Booking
                 </Link>
-                <Link href="/reporting" className="sidebar-item">
+                <Link href="/reporting" className={`sidebar-item ${isActive(["/reporting", "/reports"]) ? "active" : ""}`}>
                     <MdBarChart size={16} /> Reporting
                 </Link>
-                <Link href="/settings" className="sidebar-item">
+                <Link href="/settings" className={`sidebar-item ${isActive(["/settings"]) ? "active" : ""}`}>
                     <MdSettings size={16} /> System Settings
                 </Link>
             </nav>
