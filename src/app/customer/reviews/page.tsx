@@ -1,5 +1,6 @@
 "use client";
 import { useState } from "react";
+import { API_BASE_URL } from "@/lib/api";
 
 export default function SubmitReview() {
   const [customerId, setCustomerId] = useState("");
@@ -9,7 +10,7 @@ export default function SubmitReview() {
   const [message, setMessage] = useState("");
 
   const handleSubmit = async () => {
-    const res = await fetch(`http://localhost:5020/api/customers/${customerId}/reviews`, {
+    const res = await fetch(`${API_BASE_URL}/api/customers/${customerId}/reviews`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ serviceId, rating, comment }),

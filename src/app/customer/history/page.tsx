@@ -1,5 +1,6 @@
 "use client";
 import { useState } from "react";
+import { API_BASE_URL } from "@/lib/api";
 
 interface Invoice {
   id: string;
@@ -27,7 +28,7 @@ export default function PurchaseHistory() {
 
   const handleSearch = async () => {
     setLoading(true);
-    const res = await fetch(`http://localhost:5020/api/customers/${customerId}/history/purchases`);
+    const res = await fetch(`${API_BASE_URL}/api/customers/${customerId}/history/purchases`);
     const data = await parseJsonSafe(res);
     setInvoices(data);
     setSearched(true);

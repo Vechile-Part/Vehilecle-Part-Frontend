@@ -1,7 +1,8 @@
 "use client";
 import { useState } from "react";
+import { API_BASE_URL } from "@/lib/api";
 
-const API = "http://localhost:5020";
+const API = API_BASE_URL;
 const parseJsonSafe = async (res: Response) => {
   const text = await res.text();
   if (!text) return null;

@@ -1,7 +1,8 @@
 "use client";
 import { useState } from "react";
+import { API_BASE_URL } from "@/lib/api";
 
-const API = "http://localhost:5020";
+const API = API_BASE_URL;
 
 const authHeaders = (): HeadersInit => {
   const token = typeof window !== "undefined" ? localStorage.getItem("authToken") : null;

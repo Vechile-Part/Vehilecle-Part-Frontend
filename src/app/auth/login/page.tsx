@@ -3,8 +3,9 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { API_BASE_URL } from "@/lib/api";
 
-const API = "http://localhost:5020";
+const API = API_BASE_URL;
 
 export default function CustomerLoginPage() {
   const router = useRouter();
@@ -13,43 +14,57 @@ export default function CustomerLoginPage() {
   const [message, setMessage] = useState("");
 
   const submit = async () => {
+    if (!email.trim() || !password) {
+      setMessage("Please enter both email and password.");
+      return;
+    }
     try {
-      const res = await fetch(`${API}/api/auth/login`, {
+      const res = await fetch(`${API}/api/auth/customer/login`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password }),
+        body: JSON.stringify({ email: email.trim(), password }),
       });
 
-      if (!res.ok) {
-        setMessage("Login failed. Check credentials or backend login endpoint.");
-        return;
-      }
-
       const text = await res.text();
-      if (!text) {
-        setMessage("Login succeeded.");
+      let data: unknown = null;
+      if (text) {
+        try {
+          data = JSON.parse(text);
+        } catch {
+          data = text;
+        }
+      }
+
+      if (!res.ok) {
+        const obj = (data ?? {}) as Record<string, unknown>;
+        const detail =
+          (typeof data === "string" && data) ||
+          (obj.detail as string | undefined) ||
+          (obj.Detail as string | undefined) ||
+          (obj.message as string | undefined) ||
+          (obj.Message as string | undefined) ||
+          (obj.title as string | undefined) ||
+          (obj.Title as string | undefined) ||
+          (res.status === 401
+            ? "Invalid email or password."
+            : `Login failed (HTTP ${res.status} ${res.statusText}).`);
+        setMessage(detail);
         return;
       }
 
-      try {
-        const data = JSON.parse(text) as { token?: string; customerId?: string; userId?: string; id?: string };
-        if (data?.token) {
-          localStorage.setItem("authToken", data.token);
-        }
-        const sessionId = data?.customerId || data?.userId || data?.id;
-        if (sessionId) localStorage.setItem("customerId", sessionId);
-        if (data?.token || sessionId) {
-          setMessage("Login succeeded.");
-          router.push("/customer/profile");
-        } else {
-          setMessage("Login response received.");
-        }
-      } catch {
+      const obj = (data ?? {}) as { token?: string; customerId?: string; userId?: string; id?: string };
+      if (obj.token) localStorage.setItem("authToken", obj.token);
+      const sessionId = obj.customerId || obj.userId || obj.id;
+      if (sessionId) localStorage.setItem("customerId", sessionId);
+      if (obj.token || sessionId) {
+        setMessage("Login succeeded.");
+        router.push("/customer/profile");
+      } else {
         setMessage("Login succeeded.");
         router.push("/customer/profile");
       }
-    } catch {
-      setMessage("Login failed. Server is unreachable.");
+    } catch (err) {
+      setMessage(err instanceof Error ? `Login failed: ${err.message}` : "Login failed. Server is unreachable.");
     }
   };
 

@@ -2,11 +2,22 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useEffect, useState } from "react";
 import { MdDashboard, MdInventory, MdPeople, MdPointOfSale, MdCalendarToday, MdBarChart, MdSettings, MdHelp, MdLogout } from "react-icons/md";
 import { FaUserFriends } from "react-icons/fa";
 
 function Sidebar() {
     const pathname = usePathname();
+    const [authed, setAuthed] = useState<boolean | null>(null);
+
+    useEffect(() => {
+        const token = typeof window !== "undefined" ? localStorage.getItem("authToken") : null;
+        setAuthed(Boolean(token));
+    }, []);
+
+    if (authed === null) return null;
+    if (!authed) return null;
+
     const isActive = (paths: string[]) =>
         paths.some((path) => pathname === path || pathname.startsWith(`${path}/`));
 

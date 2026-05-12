@@ -3,7 +3,7 @@
 import { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { FiClock, FiDownload, FiFilter, FiMail, FiMapPin, FiPhone, FiSearch, FiTruck } from "react-icons/fi";
-import { API_BASE_URL } from "../../../lib/api";
+import { API_BASE_URL } from "@/lib/api";
 
 const API = API_BASE_URL;
 const PAGE_SIZE = 4;

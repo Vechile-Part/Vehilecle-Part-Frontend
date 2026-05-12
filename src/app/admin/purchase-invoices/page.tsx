@@ -3,7 +3,7 @@
 import type { CSSProperties } from "react";
 import { useEffect, useState } from "react";
 import { FiFileText, FiLoader, FiPlusCircle, FiRefreshCw, FiTrash2 } from "react-icons/fi";
-import { API_BASE_URL } from "../../../lib/api";
+import { API_BASE_URL } from "@/lib/api";
 
 const API = API_BASE_URL;
 const TAX_RATE = 0.08;
