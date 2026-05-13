@@ -1,0 +1,9 @@
+/* Base navbar shell (height, font). `.navbar.customer-portal-navbar` overrides below. */
+.navbar {
+    font-family: 'Playfair Display', serif;
+    background: #FAF5EE;
+    border-bottom: 0.5px solid #DDD3C4;
+    height: 56px;
+    display: flex;
+    align-items: center;
+}

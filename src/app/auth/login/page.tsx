@@ -2,69 +2,141 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { API_BASE_URL } from "@/lib/api";
+import { getRolesFromToken, roleStringImpliesAdmin, roleStringImpliesStaff, safeInternalPath } from "@/lib/jwtRole";
 
-const API = "http://localhost:5020";
+const API = API_BASE_URL;
 
-export default function CustomerLoginPage() {
+async function parseJsonSafe(res: Response): Promise<unknown> {
+  const text = await res.text();
+  if (!text) return null;
+  try {
+    return JSON.parse(text);
+  } catch {
+    return null;
+  }
+}
+
+function extractToken(body: Record<string, unknown>): string | undefined {
+  const direct = body.token ?? body.Token ?? body.accessToken ?? body.AccessToken;
+  if (typeof direct === "string" && direct.includes(".")) return direct;
+  const nested = body.data ?? body.Data;
+  if (nested && typeof nested === "object" && !Array.isArray(nested)) {
+    return extractToken(nested as Record<string, unknown>);
+  }
+  return undefined;
+}
+
+function resolveUserKind(token: string, body: Record<string, unknown>): "admin" | "staff" | null {
+  const raw = body.role ?? body.Role;
+  if (typeof raw === "number") {
+    if (raw === 1) return "admin";
+    if (raw === 2) return "staff";
+  }
+  const s = String(raw ?? "").trim();
+  if (roleStringImpliesAdmin(s)) return "admin";
+  if (roleStringImpliesStaff(s)) return "staff";
+  for (const r of getRolesFromToken(token)) {
+    if (roleStringImpliesAdmin(r)) return "admin";
+    if (roleStringImpliesStaff(r)) return "staff";
+  }
+  return null;
+}
+
+export default function LoginPage() {
   const router = useRouter();
+  const [nextPath, setNextPath] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [message, setMessage] = useState("");
 
+  useEffect(() => {
+    const q = new URLSearchParams(window.location.search);
+    setNextPath(safeInternalPath(q.get("next"), ""));
+  }, []);
+
   const submit = async () => {
+    if (!email.trim() || !password) {
+      setMessage("Please enter both email and password.");
+      return;
+    }
+    setMessage("");
     try {
-      const res = await fetch(`${API}/api/auth/login`, {
+      const userRes = await fetch(`${API}/api/auth/login`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password }),
+        body: JSON.stringify({ email: email.trim(), password }),
       });
+      const userData = (await parseJsonSafe(userRes)) as Record<string, unknown> | null;
 
-      if (!res.ok) {
-        setMessage("Login failed. Check credentials or backend login endpoint.");
+      if (userRes.ok && userData) {
+        const token = extractToken(userData);
+        if (!token) {
+          setMessage("Sign-in could not be completed.");
+          return;
+        }
+        const kind = resolveUserKind(token, userData);
+        if (!kind) {
+          setMessage("Sign-in could not be completed.");
+          return;
+        }
+        localStorage.setItem("authToken", token);
+        localStorage.removeItem("customerId");
+        if (kind === "admin") {
+          const dest = nextPath && nextPath.startsWith("/admin") ? nextPath : "/admin/parts";
+          router.push(dest);
+          return;
+        }
+        router.push(nextPath || "/customers");
         return;
       }
 
-      const text = await res.text();
-      if (!text) {
-        setMessage("Login succeeded.");
-        return;
-      }
+      const custRes = await fetch(`${API}/api/auth/customer/login`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: email.trim(), password }),
+      });
+      const custData = (await parseJsonSafe(custRes)) as Record<string, unknown> | null;
 
-      try {
-        const data = JSON.parse(text) as { token?: string; customerId?: string; userId?: string; id?: string };
-        if (data?.token) {
-          localStorage.setItem("authToken", data.token);
-        }
-        const sessionId = data?.customerId || data?.userId || data?.id;
-        if (sessionId) localStorage.setItem("customerId", sessionId);
-        if (data?.token || sessionId) {
-          setMessage("Login succeeded.");
-          router.push("/customer/profile");
-        } else {
-          setMessage("Login response received.");
-        }
-      } catch {
-        setMessage("Login succeeded.");
+      if (custRes.ok && custData) {
+        const token = (custData.token ?? custData.Token) as string | undefined;
+        const sessionId = (custData.customerId ??
+          custData.CustomerId ??
+          custData.userId ??
+          custData.id) as string | undefined;
+        if (token) localStorage.setItem("authToken", token);
+        if (sessionId) localStorage.setItem("customerId", String(sessionId));
         router.push("/customer/profile");
+        return;
       }
-    } catch {
-      setMessage("Login failed. Server is unreachable.");
+
+      setMessage("Invalid email or password.");
+    } catch (err) {
+      setMessage(err instanceof Error ? `Sign-in failed: ${err.message}` : "Sign-in failed. Server is unreachable.");
     }
   };
 
   return (
     <main className="form-page">
       <section className="form-card narrow">
-        <h1 className="form-title">Customer Login</h1>
-        <p className="form-subtitle">Sign in to access your account and services.</p>
+        <h1 className="form-title">Sign in</h1>
+        <p className="form-subtitle">Enter your email and password to continue.</p>
         <div className="form-grid">
           <input className="form-input" placeholder="Email" value={email} onChange={(e) => setEmail(e.target.value)} />
           <input className="form-input" placeholder="Password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} />
-          <button className="form-button" onClick={submit}>Login</button>
+          <button type="button" className="form-button" onClick={submit}>
+            Sign in
+          </button>
         </div>
         <p className="form-message">
-          New customer? <Link href="/auth/register">Register here</Link>
+          New here? <Link href="/auth/register">Create an account</Link>
+        </p>
+        <p className="form-message" style={{ marginTop: "0.5rem", fontSize: "0.9rem" }}>
+          Need to register someone else after signing in?{" "}
+          <Link href="/auth/login?next=/staff/register">Open sign-in with return path</Link>
+          {" → "}
+          <Link href="/staff/register">registration</Link>
         </p>
         {message && <p className="form-message">{message}</p>}
       </section>

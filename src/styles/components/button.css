@@ -1,0 +1,5 @@
+/**
+ * Shared button primitives.
+ * Primary button styles currently live under page-specific selectors
+ * (e.g. .auth-register-primary, .purchase-invoice-*-button) until unified.
+ */

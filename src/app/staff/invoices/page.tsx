@@ -1,7 +1,8 @@
 "use client";
 import { useState } from "react";
+import { API_BASE_URL } from "@/lib/api";
 
-const API = "http://localhost:5020";
+const API = API_BASE_URL;
 const parseJsonSafe = async (res: Response) => {
   const text = await res.text();
   if (!text) return null;
@@ -12,6 +13,15 @@ const parseJsonSafe = async (res: Response) => {
   }
 };
 
+const authHeaders = (): Record<string, string> => {
+  const h: Record<string, string> = { "Content-Type": "application/json" };
+  if (typeof window !== "undefined") {
+    const t = localStorage.getItem("authToken");
+    if (t) h.Authorization = `Bearer ${t}`;
+  }
+  return h;
+};
+
 export default function StaffInvoicesPage() {
   const [invoice, setInvoice] = useState({ customerId: "", totalAmount: 0, paidAmount: 0 });
   const [invoiceId, setInvoiceId] = useState("");
@@ -20,7 +30,7 @@ export default function StaffInvoicesPage() {
   const createInvoice = async () => {
     const res = await fetch(`${API}/api/staff/sales-invoices`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: authHeaders(),
       body: JSON.stringify({ ...invoice, totalAmount: Number(invoice.totalAmount), paidAmount: Number(invoice.paidAmount) }),
     });
     const data = await parseJsonSafe(res);
@@ -32,7 +42,10 @@ export default function StaffInvoicesPage() {
   };
 
   const sendEmail = async () => {
-    const res = await fetch(`${API}/api/staff/sales-invoices/${invoiceId}/send-email`, { method: "POST" });
+    const res = await fetch(`${API}/api/staff/sales-invoices/${invoiceId}/send-email`, {
+      method: "POST",
+      headers: authHeaders(),
+    });
     setMsg(res.ok ? "Invoice email sent" : "Email send failed");
   };
 

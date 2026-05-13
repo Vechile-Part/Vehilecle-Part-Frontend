@@ -3,10 +3,19 @@
 import { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { FiClock, FiDownload, FiFilter, FiMail, FiMapPin, FiPhone, FiSearch, FiTruck } from "react-icons/fi";
-import { API_BASE_URL } from "../../../lib/api";
+import { API_BASE_URL } from "@/lib/api";
 
 const API = API_BASE_URL;
 const PAGE_SIZE = 4;
+
+const staffRequestHeaders = (): Record<string, string> => {
+  const h: Record<string, string> = { Accept: "application/json" };
+  if (typeof window !== "undefined") {
+    const t = localStorage.getItem("authToken");
+    if (t) h.Authorization = `Bearer ${t}`;
+  }
+  return h;
+};
 
 type SearchCustomer = {
   id: string;
@@ -247,7 +256,9 @@ const searchByField = async (field: "fullName" | "phone" | "vehicleNumber", quer
   });
   params.set(field, query);
 
-  const response = await fetch(`${API}/api/staff/customers/search?${params.toString()}`);
+  const response = await fetch(`${API}/api/staff/customers/search?${params.toString()}`, {
+    headers: staffRequestHeaders(),
+  });
   const data = await parseJsonSafe(response);
 
   if (!response.ok) {
@@ -375,7 +386,9 @@ function StaffCustomersPageContent() {
       setDetailError(null);
 
       try {
-        const detailsResponse = await fetch(`${API}/api/staff/customers/${selectedCustomerId}`);
+        const detailsResponse = await fetch(`${API}/api/staff/customers/${selectedCustomerId}`, {
+          headers: staffRequestHeaders(),
+        });
         const detailsData = await parseJsonSafe(detailsResponse);
 
         if (!detailsResponse.ok) {
