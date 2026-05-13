@@ -1,0 +1,116 @@
+/**
+ * Design tokens — PartTrack / Vehicle Parts warm palette.
+ * Values mirror legacy hex literals elsewhere for safe incremental adoption.
+ */
+:root {
+    /* Core app surface */
+    --background: #f8f3e7;
+    --foreground: #2b2418;
+
+    /* Neutrals & ink */
+    --pt-ink: #1f140b;
+    --pt-ink-2: #2a1d0f;
+    --pt-ink-3: #2b2015;
+    --pt-ink-4: #2e2216;
+    --pt-ink-5: #2f2418;
+    --pt-muted: #5f4d38;
+    --pt-muted-2: #6b5740;
+    --pt-muted-3: #6e5a43;
+    --pt-muted-4: #746350;
+    --pt-muted-5: #766451;
+    --pt-muted-6: #7a6650;
+    --pt-muted-7: #7c6547;
+    --pt-muted-8: #7d6750;
+    --pt-muted-9: #8a7358;
+    --pt-muted-10: #8b7458;
+    --pt-muted-11: #8c7557;
+    --pt-muted-12: #967f61;
+    --pt-muted-13: #9a866a;
+    --pt-muted-14: #9b876c;
+    --pt-muted-15: #9a805d;
+    --pt-muted-16: #a59175;
+
+    /* Cream / paper */
+    --pt-paper: #ffffff;
+    --pt-cream-50: #fffdf8;
+    --pt-cream-100: #fff9ef;
+    --pt-cream-150: #fffaf1;
+    --pt-cream-200: #fff4df;
+    --pt-cream-250: #fff2db;
+    --pt-cream-300: #faf5ee;
+    --pt-cream-400: #faf3e6;
+    --pt-cream-500: #f5ead8;
+    --pt-cream-600: #f0e4cf;
+    --pt-cream-700: #f0dfbf;
+    --pt-cream-800: #f5e4c3;
+    --pt-cream-900: #f2ddb3;
+
+    /* Borders */
+    --pt-border: #dccbb1;
+    --pt-border-2: #dcc8ab;
+    --pt-border-3: #d8c8af;
+    --pt-border-4: #d8c3a1;
+    --pt-border-5: #e7d5bb;
+    --pt-border-6: #e7d9be;
+    --pt-border-7: #e2d3b6;
+    --pt-border-8: #eadfcd;
+    --pt-border-9: #ead4b1;
+    --pt-border-10: #ead9bf;
+    --pt-border-11: #efe2cf;
+    --pt-border-12: #dfceb6;
+    --pt-border-13: #e0d0b4;
+    --pt-border-14: #d6b98e;
+    --pt-border-15: #cc9e5c;
+    --pt-border-16: #cbb89a;
+    --pt-border-17: #c9b08c;
+    --pt-border-18: #ddd3c4;
+
+    /* Accent / brown */
+    --pt-brown: #3d2817;
+    --pt-brown-2: #3b2c1b;
+    --pt-brown-3: #4a3018;
+    --pt-brown-4: #624824;
+    --pt-brown-5: #6d4922;
+    --pt-brown-6: #6e4821;
+    --pt-brown-7: #74532a;
+    --pt-brown-8: #7d5d35;
+    --pt-brown-9: #8a693f;
+    --pt-brown-10: #2c1f11;
+    --pt-brown-11: #2a1c0f;
+    --pt-brown-12: #22170d;
+    --pt-brown-13: #24170d;
+    --pt-brown-14: #25190f;
+    --pt-brown-15: #20140b;
+
+    /* Status */
+    --pt-success-bg: #edf7ee;
+    --pt-success-border: #b9d8bc;
+    --pt-success-text: #225a2a;
+    --pt-error-bg: #fcf1ed;
+    --pt-error-border: #e8c1b8;
+    --pt-error-text: #8f3d2b;
+    --pt-danger: #c63121;
+
+    /* Layout */
+    --pt-radius-sm: 10px;
+    --pt-radius-md: 12px;
+    --pt-radius-lg: 16px;
+    --pt-radius-xl: 18px;
+    --pt-radius-2xl: 20px;
+    --pt-radius-3xl: 24px;
+    --pt-shadow-soft: 0 1px 2px rgba(47, 36, 24, 0.05);
+    --pt-shadow-card: 0 1px 2px rgba(47, 36, 24, 0.06);
+    --pt-shadow-elevated: 0 1px 3px rgba(47, 36, 24, 0.07);
+    --pt-focus-ring: 0 0 0 2px #a88962;
+    --pt-focus-ring-strong: 0 0 0 2px #8a693f;
+
+    /* Typography */
+    --pt-font-ui: Arial, Helvetica, sans-serif;
+    --pt-font-display: Georgia, "Times New Roman", serif;
+    --pt-font-nav-logo: "Playfair Display", serif;
+
+    /* z-index scale */
+    --z-dropdown: 50;
+    --z-modal: 100;
+    --z-toast: 200;
+}

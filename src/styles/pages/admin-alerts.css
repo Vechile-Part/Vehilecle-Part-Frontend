@@ -1,0 +1,83 @@
+/* Admin stock & credit alerts — matches financial-reports + auth register tone */
+
+.admin-alerts-page .alerts-kpi-row {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 16px;
+}
+
+@media (max-width: 900px) {
+    .admin-alerts-page .alerts-kpi-row {
+        grid-template-columns: 1fr;
+    }
+}
+
+.admin-alerts-page .alerts-two-col {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: 22px;
+    align-items: start;
+}
+
+@media (max-width: 960px) {
+    .admin-alerts-page .alerts-two-col {
+        grid-template-columns: 1fr;
+    }
+}
+
+.admin-alerts-page .alerts-bullet-list {
+    margin: 12px 0 0;
+    padding-left: 1.25rem;
+    font-size: 0.95rem;
+    line-height: 1.65;
+    color: #5f4d38;
+}
+
+.admin-alerts-page .alerts-bullet-list li {
+    margin-bottom: 6px;
+}
+
+.admin-alerts-page .alerts-refresh-btn {
+    min-height: 44px;
+    padding: 0 22px;
+    border-radius: 10px;
+    border: 1px solid #4a3419;
+    background: #3d2817;
+    color: #fff8ef;
+    font: inherit;
+    font-size: 0.92rem;
+    font-weight: 700;
+    cursor: pointer;
+    align-self: center;
+}
+
+.admin-alerts-page .alerts-refresh-btn:hover:not(:disabled) {
+    background: #2a1c0f;
+}
+
+.admin-alerts-page .alerts-refresh-btn:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+}
+
+.admin-alerts-page .alerts-muted-block {
+    padding: 14px 0 6px;
+    font-size: 0.95rem;
+    line-height: 1.55;
+    color: #6b5740;
+}
+
+.admin-alerts-page .alerts-footnote {
+    margin-top: 20px;
+    padding: 14px 18px;
+    border-radius: 14px;
+    background: #fffdf8;
+    border: 1px dashed #dcc8ab;
+    font-size: 0.88rem;
+    line-height: 1.55;
+    color: #6e5a43;
+}
+
+.admin-alerts-page .alerts-footnote strong {
+    color: #2a1d0f;
+}

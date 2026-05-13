@@ -22,7 +22,6 @@ export default function CustomerRegisterPage() {
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [confirmPassword, setConfirmPassword] = useState("")
-  const [agree, setAgree] = useState(false)
   const [loading, setLoading] = useState(false)
   const [result, setResult] = useState<{ kind: "success" | "error"; message: string } | null>(null)
 
@@ -72,11 +71,20 @@ export default function CustomerRegisterPage() {
           className="auth-register-form"
           onSubmit={(e) => {
             e.preventDefault()
-            if (!loading && agree) submit()
+            if (!loading) submit()
           }}
         >
           <header className="auth-register-form-head">
-            <h2>Customer Information</h2>
+            <div className="auth-register-brand">
+              <img src="/assets/log.png" alt="" width={48} height={48} className="auth-register-brand-logo" />
+              <div className="auth-register-brand-copy">
+                <h2>Create your own account</h2>
+                <p className="auth-register-lead">
+                  Customers can join in <strong>two ways</strong>. <strong>This page is option A:</strong> you register yourself and choose a password now.
+                  <strong> Option B:</strong> staff adds you at the workshop—you receive an email to set your password and you should <em>not</em> fill out this form.
+                </p>
+              </div>
+            </div>
           </header>
 
           <div className="auth-register-field">
@@ -138,16 +146,11 @@ export default function CustomerRegisterPage() {
             />
           </div>
 
-          <label className="auth-register-terms">
-            <input type="checkbox" checked={agree} onChange={(e) => setAgree(e.target.checked)} />
-            <span>I agree to terms</span>
-          </label>
-
           <div className="auth-register-actions">
             <Link href="/auth/login" className="auth-register-link">
               Already have an account? <strong>Sign in</strong>
             </Link>
-            <button type="submit" className="auth-register-primary" disabled={loading || !agree}>
+            <button type="submit" className="auth-register-primary" disabled={loading}>
               {loading ? "Registering…" : "Register"}
             </button>
           </div>
@@ -157,13 +160,6 @@ export default function CustomerRegisterPage() {
               {result.message}
             </div>
           )}
-
-          <p className="auth-register-foot">
-            Need a staff account?{" "}
-            <Link href="/staff/register" className="auth-register-foot-link">
-              Register as staff
-            </Link>
-          </p>
         </form>
       </div>
     </section>

@@ -1,0 +1,168 @@
+/* Admin / staff sidebar brand (non–customer-portal shell) */
+.sidebar-product-brand {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 18px 22px 10px;
+    font-family: var(--pt-font-display);
+    font-size: 1.65rem;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    color: var(--pt-ink-2);
+    border-bottom: 1px solid #e7d5bb;
+    text-decoration: none;
+}
+
+.sidebar-product-brand-logo {
+    display: block;
+    width: 36px;
+    height: 36px;
+    object-fit: contain;
+    flex-shrink: 0;
+}
+
+.sidebar-product-brand-text {
+    line-height: 1.1;
+}
+
+.sidebar-product-brand:hover {
+    color: #4a3318;
+}
+
+/* ---- App sidebar: single-column shell (pairs with .customer-portal-sidebar) ---- */
+.sidebar {
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh;
+    flex-shrink: 0;
+    font-family: var(--pt-font-ui, system-ui, -apple-system, "Segoe UI", sans-serif);
+}
+
+.sidebar.customer-portal-sidebar {
+    box-shadow: none;
+}
+
+.sidebar .sidebar-badge {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.sidebar-nav {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    overflow-x: hidden;
+}
+
+.sidebar-nav-heading {
+    margin: 4px 22px 0;
+    font-size: 0.68rem;
+    font-weight: 700;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: #8a7358;
+}
+
+.sidebar-bottom {
+    margin-top: auto;
+}
+
+.sidebar-search-block {
+    padding: 12px 16px 4px;
+}
+
+.sidebar-search-label {
+    display: block;
+    margin: 0 6px 6px;
+    font-size: 0.68rem;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: #8a7358;
+}
+
+.sidebar-search {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-height: 44px;
+    padding: 0 14px;
+    border: 1px solid #e0cdb0;
+    border-radius: 12px;
+    background: #fffdf8;
+    color: #7c6547;
+    transition: border-color 0.15s ease;
+}
+
+.sidebar-search:focus-within {
+    border-color: #8a693f;
+    box-shadow: none;
+    outline: 2px solid #c4a574;
+    outline-offset: 1px;
+}
+
+.sidebar-search-icon {
+    flex-shrink: 0;
+    opacity: 0.85;
+}
+
+.sidebar-search-input {
+    flex: 1;
+    min-width: 0;
+    border: none;
+    outline: none;
+    background: transparent;
+    color: #2e2216;
+    font: inherit;
+    font-size: 0.9rem;
+}
+
+.sidebar-search-input::placeholder {
+    color: #9a866a;
+}
+
+.sidebar-toolbar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 16px 6px;
+}
+
+.sidebar-icon-btn {
+    width: 40px;
+    height: 40px;
+    border-radius: 12px;
+    border: 1px solid #e5d4bc;
+    background: #fffaf1;
+    color: #3d2e1c;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    text-decoration: none;
+    transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+
+.sidebar-icon-btn:hover {
+    background: #fff8ec;
+    border-color: #d4bc9a;
+    color: #1f140b;
+}
+
+.customer-portal-sidebar .sidebar-item {
+    transition: background 0.15s ease, color 0.15s ease;
+}
+
+.customer-portal-sidebar .sidebar-item:hover:not(.active) {
+    background: #fff4e0;
+}
+
+.sidebar-role-unknown {
+    margin: 12px 18px;
+    font-size: 0.88rem;
+    line-height: 1.45;
+    color: #7a6249;
+}

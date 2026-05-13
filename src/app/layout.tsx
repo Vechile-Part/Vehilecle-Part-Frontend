@@ -1,8 +1,6 @@
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
-import AppHeader from "./AppHeader";
-import Footer from "../Components/Footer";
-import Sidebar from "../Components/Sidebar";
+import ConditionalAppChrome from "../Components/ConditionalAppChrome";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -14,16 +12,7 @@ export default function RootLayout({ children }: Readonly<{ children: ReactNode 
     return (
         <html lang="en">
         <body>
-        <div className="layout-body">
-            <Sidebar />
-            <div className="layout-content">
-                <AppHeader />
-                <main className="layout-main">
-                    {children}
-                </main>
-                <Footer />
-            </div>
-        </div>
+            <ConditionalAppChrome>{children}</ConditionalAppChrome>
         </body>
         </html>
     );

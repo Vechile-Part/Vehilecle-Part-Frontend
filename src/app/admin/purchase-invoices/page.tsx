@@ -347,7 +347,7 @@ export default function AdminPurchaseInvoicesPage() {
 
     try {
       const response = await fetch(`${API}/api/purchase-invoices`, {
-        headers: { Accept: "application/json" },
+        headers: authHeaders(),
       });
       const payload = await readResponsePayload(response);
 
