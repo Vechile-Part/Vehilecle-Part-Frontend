@@ -1,0 +1,108 @@
+.review-page {
+    padding: 40px;
+    background-color: #f7f4ef;
+    min-height: 100vh;
+}
+
+.review-title {
+    font-size: 48px;
+    color: #4b321d;
+    margin-bottom: 10px;
+}
+
+.review-subtitle {
+    color: #777;
+    margin-bottom: 40px;
+}
+
+.review-card {
+    background: white;
+    border-radius: 20px;
+    padding: 40px;
+    max-width: 600px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+    display: flex;
+    flex-direction: column;
+    gap: 28px;
+}
+
+.review-section {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.review-label {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 2px;
+    color: #aaa;
+}
+
+.review-input {
+    padding: 14px;
+    border-radius: 10px;
+    border: 1px solid #ddd;
+    font-size: 14px;
+}
+
+.review-textarea {
+    padding: 14px;
+    border-radius: 10px;
+    border: 1px solid #ddd;
+    font-size: 14px;
+    height: 120px;
+    resize: none;
+}
+
+.star-row {
+    display: flex;
+    gap: 10px;
+}
+
+.star {
+    font-size: 36px;
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: #ddd;
+    transition: color 0.2s;
+}
+
+.active-star {
+    color: #4b321d;
+}
+
+.review-button-group {
+    display: flex;
+    justify-content: flex-end;
+    gap: 20px;
+    margin-top: 10px;
+}
+
+.review-cancel-btn {
+    padding: 14px 28px;
+    border-radius: 12px;
+    border: 1px solid #ccc;
+    background: white;
+    cursor: pointer;
+}
+
+.review-submit-btn {
+    padding: 14px 28px;
+    border-radius: 12px;
+    border: none;
+    background: #4b321d;
+    color: white;
+    cursor: pointer;
+    font-size: 15px;
+    font-weight: 600;
+}
+
+.review-submit-btn:hover {
+    background: #3a2515;
+}
+.review-no-appointments {
+    color: #999;
+    font-size: 14px;
+}
