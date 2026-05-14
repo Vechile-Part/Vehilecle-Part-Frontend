@@ -5,15 +5,17 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="35dd5db6-384e-439f-8b4e-e2615cfc58bb" name="Changes" comment="">
-      <change afterPath="$PROJECT_DIR$/src/Components/Footer.tsx" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/Components/Navbar.tsx" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/Components/Sidebar.tsx" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/styles/pages/AppointmentPage.css" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/styles/pages/HistoryPage.css" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/styles/pages/PartRequestPage.css" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/styles/pages/ReviewPage.css" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/package-lock.json" beforeDir="false" afterPath="$PROJECT_DIR$/package-lock.json" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/package.json" beforeDir="false" afterPath="$PROJECT_DIR$/package.json" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/app/AppHeader.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/src/app/AppHeader.tsx" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/app/globals.css" beforeDir="false" afterPath="$PROJECT_DIR$/src/app/globals.css" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/app/layout.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/src/app/layout.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/app/customer/appointments/page.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/src/app/customer/appointments/page.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/app/customer/history/page.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/src/app/customer/history/page.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/app/customer/part-requests/page.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/src/app/customer/part-requests/page.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/app/customer/reviews/page.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/src/app/customer/reviews/page.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/styles/global.css" beforeDir="false" afterPath="$PROJECT_DIR$/src/styles/global.css" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -56,7 +58,7 @@
     "RunOnceActivity.ShowReadmeOnStart": "true",
     "RunOnceActivity.TerminalTabsStorage.copyFrom.TerminalArrangementManager.252": "true",
     "RunOnceActivity.git.unshallow": "true",
-    "git-widget-placeholder": "navbar-sidebar-footer",
+    "git-widget-placeholder": "dashma-UI",
     "js.debugger.nextJs.config.created.client": "true",
     "js.debugger.nextJs.config.created.server": "true",
     "node.js.detected.package.eslint": "true",
@@ -65,7 +67,7 @@
     "node.js.selected.package.tslint": "(autodetect)",
     "nodejs_package_manager_path": "npm",
     "npm.Next.js: server-side.executor": "Run",
-    "ts.external.directory.path": "/Users/dashmashrestha/Desktop/3rd year /Vehilecle-Part-Frontend/node_modules/typescript/lib",
+    "ts.external.directory.path": "/Users/dashmashrestha/RiderProjects/Vehilecle-Part-Frontend/node_modules/typescript/lib",
     "vue.rearranger.settings.migration": "true"
   }
 }]]></component>
@@ -99,6 +101,7 @@
       <workItem from="1778475655209" duration="4000" />
       <workItem from="1778475784817" duration="2428000" />
       <workItem from="1778478431681" duration="7267000" />
+      <workItem from="1778682460440" duration="11293000" />
     </task>
     <servers />
   </component>

@@ -1,199 +1,243 @@
 "use client";
-import { useEffect, useState } from "react";
-import { API_BASE_URL } from "@/lib/api";
+import "../../../styles/pages/HistoryPage.css";
+import { useState, useEffect } from "react";
 
-const API = API_BASE_URL;
+const ITEMS_PER_PAGE = 6;
 
-const parseJsonSafe = async (res: Response) => {
-  const text = await res.text();
-  if (!text) return null;
-  try {
-    return JSON.parse(text);
-  } catch {
-    return null;
-  }
-};
+function HistoryPage() {
 
-const readCustomerIdFromSession = () => {
-  const fromStorage = localStorage.getItem("customerId") || localStorage.getItem("userId");
-  if (fromStorage) return fromStorage;
+    const [activeTab, setActiveTab] = useState("invoices");
+    const [history, setHistory] = useState<any>(null);
+    const [loading, setLoading] = useState(true);
 
-  const token = localStorage.getItem("authToken");
-  if (!token) return "";
+    const [invoicePage, setInvoicePage] = useState(1);
+    const [appointmentPage, setAppointmentPage] = useState(1);
+    const [reviewPage, setReviewPage] = useState(1);
 
-  try {
-    const payloadPart = token.split(".")[1];
-    if (!payloadPart) return "";
-    const normalized = payloadPart.replace(/-/g, "+").replace(/_/g, "/");
-    const json = atob(normalized.padEnd(Math.ceil(normalized.length / 4) * 4, "="));
-    const payload = JSON.parse(json) as Record<string, string>;
-    return payload.customerId || payload.sub || payload.nameid || payload.userId || "";
-  } catch {
-    return "";
-  }
-};
+    useEffect(() => {
+        const fetchHistory = async () => {
+            const token = localStorage.getItem("authToken");
+            const customerId = localStorage.getItem("customerId");
 
-type InvoiceRow = {
-  invoiceId: string;
-  issuedAtUtc: string;
-  totalAmount: number;
-  discountAmount: number;
-  paidAmount: number;
-  pendingCredit: number;
-};
+            if (!token || !customerId) {
+                setLoading(false);
+                return;
+            }
 
-type AppointmentRow = {
-  id: string;
-  appointmentDate: string;
-  serviceType: string;
-  status: string;
-  notes: string | null;
-};
+            try {
+                const response = await fetch(
+                    `http://localhost:5020/api/customer-history/${customerId}`,
+                    {
+                        headers: {
+                            "Authorization": `Bearer ${token}`,
+                        },
+                    }
+                );
 
-type ReviewRow = {
-  id: string;
-  serviceId: string;
-  rating: number;
-  comment: string | null;
-};
+                if (response.ok) {
+                    const data = await response.json();
+                    setHistory(data);
+                }
+            } catch (error) {
+                console.error(error);
+            } finally {
+                setLoading(false);
+            }
+        };
 
-type HistoryPayload = {
-  customerName: string;
-  invoices: InvoiceRow[];
-  appointments: AppointmentRow[];
-  serviceReviews: ReviewRow[];
-};
+        fetchHistory();
+    }, []);
 
-export default function CustomerHistoryPage() {
-  const [message, setMessage] = useState("");
-  const [loading, setLoading] = useState(true);
-  const [data, setData] = useState<HistoryPayload | null>(null);
+    function paginate(items: any[], page: number) {
+        const start = (page - 1) * ITEMS_PER_PAGE;
+        return items.slice(start, start + ITEMS_PER_PAGE);
+    }
 
-  useEffect(() => {
-    const run = async () => {
-      const customerId = readCustomerIdFromSession();
-      const token = localStorage.getItem("authToken");
-      if (!customerId || !token) {
-        setLoading(false);
-        setMessage("Sign in as a customer to view purchase and service history.");
-        return;
-      }
+    function PaginationControls({ currentPage, totalItems, onPageChange }: {
+        currentPage: number;
+        totalItems: number;
+        onPageChange: (page: number) => void;
+    }) {
+        const totalPages = Math.ceil(totalItems / ITEMS_PER_PAGE);
+        if (totalPages <= 1) return null;
 
-      const res = await fetch(`${API}/api/customer-history/${customerId}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+        return (
+            <div className="pagination">
+                <button
+                    className="page-btn"
+                    disabled={currentPage === 1}
+                    onClick={() => onPageChange(currentPage - 1)}
+                >
+                    ← Prev
+                </button>
 
-      const payload = await parseJsonSafe(res);
-      setLoading(false);
+                {Array.from({ length: totalPages }, (_, i) => (
+                    <button
+                        key={i + 1}
+                        className={`page-btn ${currentPage === i + 1 ? "active-page" : ""}`}
+                        onClick={() => onPageChange(i + 1)}
+                    >
+                        {i + 1}
+                    </button>
+                ))}
 
-      if (res.status === 401 || res.status === 403) {
-        setMessage("You are not allowed to view this history.");
-        return;
-      }
+                <button
+                    className="page-btn"
+                    disabled={currentPage === totalPages}
+                    onClick={() => onPageChange(currentPage + 1)}
+                >
+                    Next →
+                </button>
+            </div>
+        );
+    }
 
-      if (!res.ok || !payload) {
-        setMessage("Could not load history.");
-        return;
-      }
+    if (loading) return <div className="history-page"><p>Loading...</p></div>;
+    if (!history) return <div className="history-page"><p>You are not allowed to view this history.</p></div>;
 
-      setData({
-        customerName: payload.customerName ?? "",
-        invoices: Array.isArray(payload.invoices) ? payload.invoices : [],
-        appointments: Array.isArray(payload.appointments) ? payload.appointments : [],
-        serviceReviews: Array.isArray(payload.serviceReviews) ? payload.serviceReviews : [],
-      });
-    };
+    return (
+        <div className="history-page">
 
-    void run();
-  }, []);
+            <h1 className="history-title">My History</h1>
+            <p className="history-subtitle">View your past invoices, appointments and reviews.</p>
 
-  return (
-    <main className="form-page">
-      <section className="form-card">
-        <h1 className="form-title">Purchase and service history</h1>
-        <p className="form-subtitle">
-          Signed-in customers see sales invoices, workshop appointments, and submitted service reviews together.
-        </p>
+            <div className="history-tabs">
+                <button
+                    className={activeTab === "invoices" ? "history-tab active-tab" : "history-tab"}
+                    onClick={() => setActiveTab("invoices")}
+                >
+                    Invoices
+                </button>
+                <button
+                    className={activeTab === "appointments" ? "history-tab active-tab" : "history-tab"}
+                    onClick={() => setActiveTab("appointments")}
+                >
+                    Appointments
+                </button>
+                <button
+                    className={activeTab === "reviews" ? "history-tab active-tab" : "history-tab"}
+                    onClick={() => setActiveTab("reviews")}
+                >
+                    Reviews
+                </button>
+            </div>
 
-        {loading && <p className="form-message">Loading…</p>}
-        {!loading && message && <p className="form-message">{message}</p>}
+            {/* INVOICES */}
+            {activeTab === "invoices" && (
+                <div className="history-section">
+                    {history.invoices.length === 0 ? (
+                        <p className="history-empty">No invoices found.</p>
+                    ) : (
+                        <>
+                            {paginate(history.invoices, invoicePage).map((inv: any) => (
+                                <div key={inv.invoiceId} className="history-card">
+                                    <div className="history-card-row">
+                                        <span className="history-card-label">Date</span>
+                                        <span>{new Date(inv.issuedAtUtc).toLocaleDateString()}</span>
+                                    </div>
+                                    <div className="history-card-row">
+                                        <span className="history-card-label">Total Amount</span>
+                                        <span>Rs. {inv.totalAmount.toFixed(2)}</span>
+                                    </div>
+                                    <div className="history-card-row">
+                                        <span className="history-card-label">Discount</span>
+                                        <span>Rs. {inv.discountAmount.toFixed(2)}</span>
+                                    </div>
+                                    <div className="history-card-row">
+                                        <span className="history-card-label">Paid</span>
+                                        <span>Rs. {inv.paidAmount.toFixed(2)}</span>
+                                    </div>
+                                    <div className="history-card-row">
+                                        <span className="history-card-label">Pending Credit</span>
+                                        <span>Rs. {inv.pendingCredit.toFixed(2)}</span>
+                                    </div>
+                                    {inv.totalAmount > 5000 && (
+                                        <div className="loyalty-badge">10% Loyalty Discount Applied</div>
+                                    )}
+                                </div>
+                            ))}
+                            <PaginationControls
+                                currentPage={invoicePage}
+                                totalItems={history.invoices.length}
+                                onPageChange={setInvoicePage}
+                            />
+                        </>
+                    )}
+                </div>
+            )}
 
-        {data && (
-          <>
-            <p className="form-message" style={{ marginBottom: "1rem" }}>
-              {data.customerName}
-            </p>
+            {/* APPOINTMENTS */}
+            {activeTab === "appointments" && (
+                <div className="history-section">
+                    {history.appointments.length === 0 ? (
+                        <p className="history-empty">No appointments found.</p>
+                    ) : (
+                        <>
+                            {paginate(history.appointments, appointmentPage).map((apt: any) => (
+                                <div key={apt.id} className="history-card">
+                                    <div className="history-card-row">
+                                        <span className="history-card-label">Service</span>
+                                        <span>{apt.serviceType}</span>
+                                    </div>
+                                    <div className="history-card-row">
+                                        <span className="history-card-label">Date</span>
+                                        <span>{new Date(apt.appointmentDate).toLocaleDateString()}</span>
+                                    </div>
+                                    <div className="history-card-row">
+                                        <span className="history-card-label">Status</span>
+                                        <span className={`status-badge status-${apt.status.toLowerCase()}`}>{apt.status}</span>
+                                    </div>
+                                    {apt.notes && (
+                                        <div className="history-card-row">
+                                            <span className="history-card-label">Notes</span>
+                                            <span>{apt.notes}</span>
+                                        </div>
+                                    )}
+                                </div>
+                            ))}
+                            <PaginationControls
+                                currentPage={appointmentPage}
+                                totalItems={history.appointments.length}
+                                onPageChange={setAppointmentPage}
+                            />
+                        </>
+                    )}
+                </div>
+            )}
 
-            <h2 className="form-title" style={{ fontSize: "1.1rem", marginTop: "1rem" }}>
-              Purchases
-            </h2>
-            {data.invoices.length === 0 && <p className="form-message">No invoices yet.</p>}
-            {data.invoices.map((invoice) => (
-              <div key={invoice.invoiceId} className="result-pre">
-                <p>
-                  <strong>Date:</strong> {new Date(invoice.issuedAtUtc).toLocaleDateString()}
-                </p>
-                <p>
-                  <strong>Total:</strong> Rs. {invoice.totalAmount.toFixed(2)}
-                </p>
-                {invoice.discountAmount > 0 && (
-                  <p>
-                    <strong>Discount:</strong> Rs. {invoice.discountAmount.toFixed(2)}
-                  </p>
-                )}
-                <p>
-                  <strong>Paid:</strong> Rs. {invoice.paidAmount.toFixed(2)}
-                </p>
-                {invoice.pendingCredit > 0 && (
-                  <p>
-                    <strong>Outstanding:</strong> Rs. {invoice.pendingCredit.toFixed(2)}
-                  </p>
-                )}
-              </div>
-            ))}
+            {/* REVIEWS */}
+            {activeTab === "reviews" && (
+                <div className="history-section">
+                    {history.serviceReviews.length === 0 ? (
+                        <p className="history-empty">No reviews found.</p>
+                    ) : (
+                        <>
+                            {paginate(history.serviceReviews, reviewPage).map((rev: any) => (
+                                <div key={rev.id} className="history-card">
+                                    <div className="history-card-row">
+                                        <span className="history-card-label">Rating</span>
+                                        <span>{"★".repeat(rev.rating)}{"☆".repeat(5 - rev.rating)}</span>
+                                    </div>
+                                    {rev.comment && (
+                                        <div className="history-card-row">
+                                            <span className="history-card-label">Comment</span>
+                                            <span>{rev.comment}</span>
+                                        </div>
+                                    )}
+                                </div>
+                            ))}
+                            <PaginationControls
+                                currentPage={reviewPage}
+                                totalItems={history.serviceReviews.length}
+                                onPageChange={setReviewPage}
+                            />
+                        </>
+                    )}
+                </div>
+            )}
 
-            <h2 className="form-title" style={{ fontSize: "1.1rem", marginTop: "1.25rem" }}>
-              Service appointments
-            </h2>
-            {data.appointments.length === 0 && <p className="form-message">No appointments on file.</p>}
-            {data.appointments.map((a) => (
-              <div key={a.id} className="result-pre">
-                <p>
-                  <strong>When:</strong> {new Date(a.appointmentDate).toLocaleString()}
-                </p>
-                <p>
-                  <strong>Service:</strong> {a.serviceType}
-                </p>
-                <p>
-                  <strong>Status:</strong> {a.status}
-                </p>
-                {a.notes && (
-                  <p>
-                    <strong>Notes:</strong> {a.notes}
-                  </p>
-                )}
-              </div>
-            ))}
-
-            <h2 className="form-title" style={{ fontSize: "1.1rem", marginTop: "1.25rem" }}>
-              Service reviews
-            </h2>
-            {data.serviceReviews.length === 0 && <p className="form-message">No reviews submitted.</p>}
-            {data.serviceReviews.map((r) => (
-              <div key={r.id} className="result-pre">
-                <p>
-                  <strong>Rating:</strong> {r.rating} / 5
-                </p>
-                {r.comment && (
-                  <p>
-                    <strong>Comment:</strong> {r.comment}
-                  </p>
-                )}
-              </div>
-            ))}
-          </>
-        )}
-      </section>
-    </main>
-  );
+        </div>
+    );
 }
+
+export default HistoryPage;

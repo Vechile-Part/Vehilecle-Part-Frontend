@@ -1,0 +1,137 @@
+.history-page {
+    padding: 40px;
+    background-color: #f7f4ef;
+    min-height: 100vh;
+}
+
+.history-title {
+    font-size: 32px;
+    font-weight: 500;
+    color: #4b321d;
+    margin-bottom: 4px;
+}
+
+.history-subtitle {
+    color: #999;
+    font-size: 14px;
+    margin-bottom: 32px;
+}
+
+.history-tabs {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 24px;
+}
+
+.history-tab {
+    padding: 9px 22px;
+    border-radius: 10px;
+    border: 1px solid #ddd;
+    background: white;
+    cursor: pointer;
+    font-size: 14px;
+    color: #4b321d;
+}
+
+.active-tab {
+    background: #4b321d;
+    color: white;
+    border-color: #4b321d;
+}
+
+.history-section {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 16px;
+}
+
+.history-card {
+    background: white;
+    border-radius: 14px;
+    border: 0.5px solid #e8e0d5;
+    padding: 20px;
+}
+
+.history-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 16px;
+    padding-bottom: 12px;
+    border-bottom: 0.5px solid #f0ece6;
+}
+
+.history-card-amount {
+    font-size: 22px;
+    font-weight: 500;
+    color: #4b321d;
+}
+
+.history-card-date-small {
+    font-size: 13px;
+    color: #999;
+}
+
+.history-card-row {
+    display: flex;
+    justify-content: space-between;
+    font-size: 13px;
+    padding: 5px 0;
+}
+
+.history-card-label {
+    color: #aaa;
+}
+
+.loyalty-badge {
+    background: #f8ead4;
+    color: #7a4f1f;
+    padding: 8px 12px;
+    border-radius: 8px;
+    font-size: 12px;
+    font-weight: 500;
+    margin-top: 12px;
+}
+
+.status-badge {
+    padding: 3px 10px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 500;
+}
+
+.status-pending   { background: #fff3cd; color: #856404; }
+.status-completed { background: #e6f4ea; color: #2d6a4f; }
+.status-cancelled { background: #fde8e8; color: #c0392b; }
+
+
+
+.pagination {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    justify-content: center;
+    margin-top: 24px;
+    flex-wrap: wrap;
+}
+
+.page-btn {
+    padding: 8px 14px;
+    border-radius: 8px;
+    border: 1px solid #ddd;
+    background: white;
+    color: #4b321d;
+    cursor: pointer;
+    font-size: 13px;
+}
+
+.page-btn:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+}
+
+.active-page {
+    background: #4b321d;
+    color: white;
+    border-color: #4b321d;
+}
