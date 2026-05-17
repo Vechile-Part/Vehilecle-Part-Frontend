@@ -44,48 +44,53 @@ export default function CustomerProfilePage() {
 
   const resolvedCustomerId = useMemo(() => customerId || profile.id, [customerId, profile.id]);
 
-  const getProfile = async () => {
-    if (!resolvedCustomerId) return;
-    const res = await fetch(`${API}/api/customers/${resolvedCustomerId}/profile`);
-    if (!res.ok) return setMessage("Failed to load profile");
-    const data = await parseJsonSafe(res);
-    if (!data) return setMessage("Profile response was empty or invalid.");
-    setProfile(data);
-    if (data.id) {
-      setCustomerId(data.id);
-      localStorage.setItem("customerId", data.id);
+  const loadProfileAndVehicles = async (id: string) => {
+    localStorage.setItem("customerId", id);
+    const profileRes = await fetch(`${API}/api/customers/${id}/profile`);
+    if (profileRes.ok) {
+      const data = await parseJsonSafe(profileRes);
+      if (data && typeof data === "object" && !Array.isArray(data)) {
+        const record = data as Record<string, unknown>;
+        setProfile({
+          id: String(record.id ?? record.customerId ?? ""),
+          fullName: String(record.fullName ?? record.name ?? ""),
+          phone: String(record.phone ?? record.phoneNumber ?? ""),
+          email: String(record.email ?? record.emailAddress ?? ""),
+        });
+      }
     }
-  };
 
-  const getVehicles = async () => {
-    if (!resolvedCustomerId) return;
-    const res = await fetch(`${API}/api/customers/${resolvedCustomerId}/vehicles`);
-    if (!res.ok) return;
-    const data = await parseJsonSafe(res);
-    setVehicles(Array.isArray(data) ? data : []);
+    const vehiclesRes = await fetch(`${API}/api/customers/${id}/vehicles`);
+    if (vehiclesRes.ok) {
+      const vehiclesData = await parseJsonSafe(vehiclesRes);
+      if (Array.isArray(vehiclesData)) {
+        setVehicles(
+          vehiclesData.map((item) => ({
+            id: String((item as Record<string, unknown>).id ?? ""),
+            vehicleNumber: String((item as Record<string, unknown>).vehicleNumber ?? ""),
+            make: String((item as Record<string, unknown>).make ?? ""),
+            model: String((item as Record<string, unknown>).model ?? ""),
+            year: Number((item as Record<string, unknown>).year ?? 0),
+          })),
+        );
+      }
+    }
+
+    setMessage("Profile loaded");
+    setLoading(false);
   };
 
   useEffect(() => {
     const id = readCustomerIdFromSession();
     if (!id) {
-      setLoading(false);
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setMessage("No logged-in customer found. Please login first.");
+      setLoading(false);
       return;
     }
     setCustomerId(id);
-    localStorage.setItem("customerId", id);
-    setLoading(false);
+    void loadProfileAndVehicles(id);
   }, []);
-
-  useEffect(() => {
-    if (!resolvedCustomerId) return;
-    const load = async () => {
-      await getProfile();
-      await getVehicles();
-      setMessage("Profile loaded");
-    };
-    void load();
-  }, [resolvedCustomerId]);
 
   const updateProfile = async () => {
     if (!resolvedCustomerId) return;
@@ -123,7 +128,7 @@ export default function CustomerProfilePage() {
     if (res.ok) {
       setMessage("Vehicle added");
       setVehicle({ id: "", vehicleNumber: "", make: "", model: "", year: 2020 });
-      await getVehicles();
+      await loadProfileAndVehicles(resolvedCustomerId);
     } else {
       setMessage("Vehicle add failed");
     }
@@ -136,7 +141,7 @@ export default function CustomerProfilePage() {
     });
     if (res.ok) {
       setMessage("Vehicle deleted");
-      await getVehicles();
+      await loadProfileAndVehicles(resolvedCustomerId);
     } else {
       setMessage("Vehicle delete failed");
     }

@@ -1,0 +1,75 @@
+.vendor-page {
+  width: 100%;
+  max-width: 1200px;
+  padding: 40px;
+  display: grid;
+  gap: 24px;
+  color: #2f2418;
+}
+
+.vendor-page-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.vendor-page-title {
+  margin: 0;
+  font-size: clamp(1.8rem, 2.4vw, 2.2rem);
+  color: #1f140b;
+}
+
+.vendor-page-description {
+  margin: 8px 0 0;
+  color: #746350;
+  max-width: 640px;
+  line-height: 1.6;
+}
+
+.vendor-table-card {
+  border: 1px solid #eadfcd;
+  border-radius: 12px;
+  overflow: hidden;
+  background: #fffdf8;
+}
+
+.vendor-status-pill {
+  display: inline-flex;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+
+.vendor-status-pill.active {
+  background: #edf7ee;
+  color: #225a2a;
+}
+
+.vendor-status-pill.inactive {
+  background: #f5ece8;
+  color: #8f3d2b;
+}
+
+.vendor-actions {
+  display: flex;
+  gap: 12px;
+}
+
+.vendor-actions button {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-weight: 700;
+}
+
+.vendor-actions .edit {
+  color: #3d2817;
+}
+
+.vendor-actions .delete {
+  color: #d9534f;
+}

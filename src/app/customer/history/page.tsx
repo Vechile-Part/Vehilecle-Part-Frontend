@@ -4,10 +4,39 @@ import { useState, useEffect } from "react";
 
 const ITEMS_PER_PAGE = 6;
 
+type Invoice = {
+    invoiceId: string;
+    issuedAtUtc: string;
+    totalAmount: number;
+    discountAmount: number;
+    paidAmount: number;
+    pendingCredit: number;
+};
+
+type Appointment = {
+    id: string;
+    serviceType: string;
+    appointmentDate: string;
+    status: string;
+    notes?: string;
+};
+
+type Review = {
+    id: string;
+    rating: number;
+    comment?: string;
+};
+
+type HistoryData = {
+    invoices: Invoice[];
+    appointments: Appointment[];
+    serviceReviews: Review[];
+};
+
 function HistoryPage() {
 
     const [activeTab, setActiveTab] = useState("invoices");
-    const [history, setHistory] = useState<any>(null);
+    const [history, setHistory] = useState<HistoryData | null>(null);
     const [loading, setLoading] = useState(true);
 
     const [invoicePage, setInvoicePage] = useState(1);
@@ -48,7 +77,7 @@ function HistoryPage() {
         fetchHistory();
     }, []);
 
-    function paginate(items: any[], page: number) {
+    function paginate<T>(items: T[], page: number) {
         const start = (page - 1) * ITEMS_PER_PAGE;
         return items.slice(start, start + ITEMS_PER_PAGE);
     }
@@ -129,7 +158,7 @@ function HistoryPage() {
                         <p className="history-empty">No invoices found.</p>
                     ) : (
                         <>
-                            {paginate(history.invoices, invoicePage).map((inv: any) => (
+                            {paginate<Invoice>(history.invoices, invoicePage).map((inv) => (
                                 <div key={inv.invoiceId} className="history-card">
                                     <div className="history-card-row">
                                         <span className="history-card-label">Date</span>
@@ -173,7 +202,7 @@ function HistoryPage() {
                         <p className="history-empty">No appointments found.</p>
                     ) : (
                         <>
-                            {paginate(history.appointments, appointmentPage).map((apt: any) => (
+                            {paginate<Appointment>(history.appointments, appointmentPage).map((apt) => (
                                 <div key={apt.id} className="history-card">
                                     <div className="history-card-row">
                                         <span className="history-card-label">Service</span>
@@ -212,7 +241,7 @@ function HistoryPage() {
                         <p className="history-empty">No reviews found.</p>
                     ) : (
                         <>
-                            {paginate(history.serviceReviews, reviewPage).map((rev: any) => (
+                            {paginate<Review>(history.serviceReviews, reviewPage).map((rev) => (
                                 <div key={rev.id} className="history-card">
                                     <div className="history-card-row">
                                         <span className="history-card-label">Rating</span>

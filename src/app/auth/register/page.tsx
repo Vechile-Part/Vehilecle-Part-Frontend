@@ -1,5 +1,6 @@
 "use client"
 
+import Image from "next/image"
 import Link from "next/link"
 import { useState } from "react"
 import { API_BASE_URL } from "@/lib/api"
@@ -64,7 +65,7 @@ export default function CustomerRegisterPage() {
     <section className="auth-register">
       <div className="auth-register-card">
         <div className="auth-register-illustration">
-          <img src="/assets/parts.png" alt="Vehicle parts" />
+          <Image src="/assets/parts.png" alt="Vehicle parts" width={360} height={220} />
         </div>
 
         <form
@@ -76,7 +77,7 @@ export default function CustomerRegisterPage() {
         >
           <header className="auth-register-form-head">
             <div className="auth-register-brand">
-              <img src="/assets/log.png" alt="" width={48} height={48} className="auth-register-brand-logo" />
+              <Image src="/assets/log.png" alt="" width={48} height={48} className="auth-register-brand-logo" />
               <div className="auth-register-brand-copy">
                 <h2>Create your own account</h2>
                 <p className="auth-register-lead">

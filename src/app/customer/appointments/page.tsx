@@ -58,7 +58,9 @@ function AppointmentPage() {
         }
 
         const [timePart, meridiem] = selectedTime.split(" ");
-        let [hours, minutes] = timePart.split(":").map(Number);
+        const [hoursText, minutesText] = timePart.split(":");
+        let hours = Number(hoursText);
+        const minutes = Number(minutesText);
         if (meridiem === "PM" && hours !== 12) hours += 12;
         if (meridiem === "AM" && hours === 12) hours = 0;
 

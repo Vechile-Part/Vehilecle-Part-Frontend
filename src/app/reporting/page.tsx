@@ -123,7 +123,7 @@ export default function ReportingPage() {
     void load();
   }, [load]);
 
-  const chartBuckets = data?.chartBuckets ?? [];
+  const chartBuckets = useMemo(() => data?.chartBuckets ?? [], [data?.chartBuckets]);
   const maxBar = useMemo(() => {
     let m = 1;
     for (const b of chartBuckets) {

@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { API_BASE_URL } from "@/lib/api";
 import { getRolesFromToken, roleStringImpliesAdmin, roleStringImpliesStaff, safeInternalPath } from "@/lib/jwtRole";
 
@@ -46,15 +46,14 @@ function resolveUserKind(token: string, body: Record<string, unknown>): "admin" 
 
 export default function LoginPage() {
     const router = useRouter();
-    const [nextPath, setNextPath] = useState("");
+    const [nextPath] = useState(() => {
+        if (typeof window === "undefined") return "";
+        const q = new URLSearchParams(window.location.search);
+        return safeInternalPath(q.get("next"), "");
+    });
     const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
     const [message, setMessage] = useState("");
-
-    useEffect(() => {
-        const q = new URLSearchParams(window.location.search);
-        setNextPath(safeInternalPath(q.get("next"), ""));
-    }, []);
 
     const submit = async () => {
         if (!email.trim() || !password) {
@@ -109,7 +108,8 @@ export default function LoginPage() {
             }
 
             setMessage("Invalid email or password.");
-        } catch (err) {
+        } catch (error) {
+            console.error(error);
             setMessage("Sign-in failed. Server is unreachable.");
         }
     };
