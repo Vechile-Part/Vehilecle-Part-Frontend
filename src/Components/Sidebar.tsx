@@ -22,8 +22,8 @@ import {
   MdAssignment,
 } from "react-icons/md";
 import { FaUserFriends } from "react-icons/fa";
-import { getShellRoleFromToken } from "@/lib/jwtRole";
 import AdminNotificationBell from "./AdminNotificationBell";
+import { useAuth } from "@/Components/auth/AuthContext";
 
 type ShellRole = "admin" | "staff" | "customer";
 
@@ -193,14 +193,10 @@ function Sidebar() {
   const pathname = usePathname() ?? "";
   const router = useRouter();
   const [quickSearch, setQuickSearch] = useState("");
-  const [token, setToken] = useState<string | null>(null);
+  const { user } = useAuth();
 
-  useEffect(() => {
-    setToken(localStorage.getItem("authToken"));
-  }, [pathname]);
-
-  const authed = Boolean(token);
-  const shellRole = token ? getShellRoleFromToken(token) : null;
+  const authed = Boolean(user);
+  const shellRole = user ? user.role : null;
 
   const visibleNav = useMemo(() => {
     if (!shellRole) return [];

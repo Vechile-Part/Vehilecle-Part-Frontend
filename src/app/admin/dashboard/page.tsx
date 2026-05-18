@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { formatNpr } from "@/lib/currency";
 import { apiFetch, extractApiError, parseJsonSafe } from "@/lib/http";
+import InteractiveDashboardCharts from "@/Components/InteractiveDashboardCharts";
 
 type Dashboard = {
   todaySales: number;
@@ -33,6 +34,7 @@ const readDashboard = (raw: unknown): Dashboard | null => {
 
 export default function AdminDashboardPage() {
   const [data, setData] = useState<Dashboard | null>(null);
+  const [chartData, setChartData] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
@@ -40,14 +42,32 @@ export default function AdminDashboardPage() {
     setLoading(true);
     setError("");
     try {
-      const res = await apiFetch("/api/admin/dashboard");
+      const [res, chartRes] = await Promise.all([
+        apiFetch("/api/admin/dashboard"),
+        apiFetch("/api/admin/financial-dashboard/monthly")
+      ]);
       const body = await parseJsonSafe(res);
+      const chartBody = await parseJsonSafe(chartRes);
+
       if (!res.ok) {
         setData(null);
         setError(extractApiError(body, "Could not load dashboard."));
         return;
       }
+
       setData(readDashboard(body));
+
+      if (chartRes.ok && chartBody && typeof chartBody === "object") {
+        const rawBuckets = (chartBody as any).chartBuckets || (chartBody as any).ChartBuckets || [];
+        setChartData(
+          rawBuckets.map((b: any) => ({
+            label: String(b.label ?? b.Label ?? ""),
+            grossRevenue: Number(b.grossRevenue ?? b.GrossRevenue ?? 0),
+            operatingCosts: Number(b.operatingCosts ?? b.OperatingCosts ?? 0),
+            netProfit: Number(b.netProfit ?? b.NetProfit ?? 0),
+          }))
+        );
+      }
     } catch {
       setData(null);
       setError("Network error while loading dashboard.");
@@ -124,6 +144,10 @@ export default function AdminDashboardPage() {
           </Link>
         </article>
       </div>
+
+      {!loading && chartData.length > 0 && (
+        <InteractiveDashboardCharts data={chartData} />
+      )}
 
       <div className="admin-quick-links">
         <Link href="/pos" className="financial-reports-btn primary">

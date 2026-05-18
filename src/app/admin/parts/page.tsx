@@ -109,6 +109,10 @@ export default function AdminPartsPage() {
 
   const [form, setForm] = useState<PartForm>(emptyForm);
 
+  const [page, setPage] = useState(1);
+  const [pageSize] = useState(10);
+  const [totalCount, setTotalCount] = useState(0);
+
   const loadVendors = useCallback(async () => {
     try {
       const res = await apiFetch("/api/vendors");
@@ -130,7 +134,7 @@ export default function AdminPartsPage() {
     setStatus(null);
     try {
       const [partsRes, vendorsRes] = await Promise.all([
-        apiFetch("/api/admin/parts"),
+        apiFetch(`/api/admin/parts?page=${page}&pageSize=${pageSize}&search=${search}`),
         apiFetch("/api/vendors"),
       ]);
       const data = await parseJsonSafe(partsRes);
@@ -162,10 +166,17 @@ export default function AdminPartsPage() {
           .filter((row): row is Part => row !== null)
           .map((part) => attachVendorName(part, vendorById, soleVendorName));
 
-      if (partsRes.ok && Array.isArray(data)) {
-        setParts(mapParts(data));
+      if (partsRes.ok) {
+        if (data && typeof data === "object" && "items" in data && Array.isArray((data as any).items)) {
+          setParts(mapParts((data as any).items));
+          setTotalCount(Number((data as any).totalCount ?? 0));
+        } else if (Array.isArray(data)) {
+          setParts(mapParts(data));
+          setTotalCount(data.length);
+        }
       } else {
         setParts([]);
+        setTotalCount(0);
         setStatus({
           tone: "error",
           text: extractApiError(data, "Could not load parts. Check that you are signed in as admin."),
@@ -173,11 +184,12 @@ export default function AdminPartsPage() {
       }
     } catch {
       setParts([]);
+      setTotalCount(0);
       setStatus({ tone: "error", text: "Network error while loading parts." });
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [page, pageSize, search]);
 
   useEffect(() => {
     void loadVendors();
@@ -336,12 +348,9 @@ export default function AdminPartsPage() {
   };
 
   let filteredParts = parts.filter((p) => {
-    const matchesSearch =
-      p.name.toLowerCase().includes(search.toLowerCase()) ||
-      p.partNumber.toLowerCase().includes(search.toLowerCase());
     const matchesCategory = filterCategory === "All" || p.category === filterCategory;
     const matchesLowStock = filterLowStock ? p.quantityInStock <= 5 : true;
-    return matchesSearch && matchesCategory && matchesLowStock;
+    return matchesCategory && matchesLowStock;
   });
 
   if (sortOrder === "highToLow") {
@@ -550,7 +559,10 @@ export default function AdminPartsPage() {
             className="form-input inventory-search"
             placeholder="Search by part name or SKU…"
             value={search}
-            onChange={(e) => setSearch(e.target.value)}
+            onChange={(e) => {
+              setSearch(e.target.value);
+              setPage(1);
+            }}
           />
         </div>
 
@@ -637,6 +649,42 @@ export default function AdminPartsPage() {
           </tbody>
         </table>
         </div>
+
+        {/* Pagination controls */}
+        {totalCount > pageSize && (
+          <div className="inventory-pagination" style={{
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            padding: "16px 24px",
+            background: "#fdfbf7",
+            borderTop: "1px solid #eadfcd"
+          }}>
+            <span style={{ fontSize: "14px", color: "#6f5a45", fontWeight: "600" }}>
+              Showing {Math.min(totalCount, (page - 1) * pageSize + 1)} to {Math.min(totalCount, page * pageSize)} of {totalCount} parts
+            </span>
+            <div style={{ display: "flex", gap: "10px" }}>
+              <button
+                type="button"
+                className="form-button secondary"
+                style={{ width: "auto", padding: "8px 16px", margin: 0 }}
+                disabled={page <= 1}
+                onClick={() => setPage(page - 1)}
+              >
+                Previous
+              </button>
+              <button
+                type="button"
+                className="form-button"
+                style={{ width: "auto", padding: "8px 16px", margin: 0 }}
+                disabled={page * pageSize >= totalCount}
+                onClick={() => setPage(page + 1)}
+              >
+                Next
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
       <div className="summary-cards">

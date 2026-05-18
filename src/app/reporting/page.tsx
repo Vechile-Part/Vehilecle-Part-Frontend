@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { formatNpr } from "@/lib/currency";
 import { apiFetch, parseJsonSafe } from "@/lib/http";
+import InteractiveDashboardCharts from "@/Components/InteractiveDashboardCharts";
 
 type Period = "daily" | "monthly" | "yearly";
 
@@ -148,47 +149,15 @@ export default function ReportingPage() {
       {error && <div className="financial-reports-banner">{error}</div>}
 
       <section className="financial-reports-grid-top">
-        <div className="financial-reports-chart-card">
-          <h2 className="financial-reports-card-title">Revenue vs Expenses</h2>
-          <p className="financial-reports-card-hint">
-            {period === "yearly" ? "Last seven months" : "Last seven days"} (UTC), sales vs purchase invoices.
-          </p>
-          {loading ? (
-            <p className="financial-reports-muted">Loading chart…</p>
-          ) : (
-            <div className="financial-reports-bars" aria-hidden={chartBuckets.length === 0}>
-              {chartBuckets.map((b) => {
-                const hRev = b.grossRevenue <= 0 ? 0 : Math.max(8, Math.round((b.grossRevenue / maxBar) * 200));
-                const hCost = b.operatingCosts <= 0 ? 0 : Math.max(8, Math.round((b.operatingCosts / maxBar) * 200));
-                return (
-                <div key={b.label + b.dateUtc} className="financial-reports-bar-group">
-                  <div className="financial-reports-bar-pair">
-                    <div
-                      className="financial-reports-bar financial-reports-bar-revenue"
-                      style={{ height: `${hRev}px` }}
-                      title={`Revenue ${money(b.grossRevenue)}`}
-                    />
-                    <div
-                      className="financial-reports-bar financial-reports-bar-expense"
-                      style={{ height: `${hCost}px` }}
-                      title={`Costs ${money(b.operatingCosts)}`}
-                    />
-                  </div>
-                  <span className="financial-reports-bar-label">{b.label}</span>
-                </div>
-                );
-              })}
-            </div>
-          )}
-          <div className="financial-reports-legend">
-            <span>
-              <i className="financial-reports-dot revenue" /> Revenue
-            </span>
-            <span>
-              <i className="financial-reports-dot expense" /> Expenses
-            </span>
+        {loading ? (
+          <div className="financial-reports-chart-card" style={{ padding: "40px", textAlign: "center" }}>
+            <p className="financial-reports-muted">Loading interactive charts…</p>
           </div>
-        </div>
+        ) : (
+          <div style={{ gridColumn: "span 2" }}>
+            <InteractiveDashboardCharts data={chartBuckets} />
+          </div>
+        )}
 
         <div className="financial-reports-kpi-column">
           <article className="financial-reports-kpi">

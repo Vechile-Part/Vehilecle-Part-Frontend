@@ -7,7 +7,7 @@ import AuthFormHeader from "@/Components/auth/AuthFormHeader";
 import AuthPageShell from "@/Components/auth/AuthPageShell";
 import { apiFetch, extractApiError, parseJsonSafe } from "@/lib/http";
 import { getShellRoleFromToken, safeInternalPath } from "@/lib/jwtRole";
-import { persistAuthSession } from "@/lib/session";
+import { useAuth } from "@/Components/auth/AuthContext";
 
 function extractToken(body: Record<string, unknown>): string | undefined {
     const direct = body.token ?? body.Token ?? body.accessToken ?? body.AccessToken;
@@ -25,6 +25,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 export default function LoginPage() {
     const router = useRouter();
+    const { login } = useAuth();
     const [nextPath] = useState(() => {
         if (typeof window === "undefined") return "";
         const q = new URLSearchParams(window.location.search);
@@ -55,7 +56,7 @@ export default function LoginPage() {
                 if (token) {
                     const shell = getShellRoleFromToken(token);
                     if (shell === "admin" || shell === "staff") {
-                        persistAuthSession(token);
+                        login(token);
                         if (shell === "admin") {
                             const dest = nextPath && nextPath.startsWith("/admin") ? nextPath : "/admin/parts";
                             router.push(dest);
@@ -85,7 +86,7 @@ export default function LoginPage() {
                     custData.userId ??
                     custData.id) as string | undefined;
                 if (token) {
-                    persistAuthSession(token, sessionId ? String(sessionId) : null);
+                    login(token, sessionId ? String(sessionId) : null);
                     router.push(nextPath && nextPath.startsWith("/customer") ? nextPath : "/customer/profile");
                     return;
                 }
