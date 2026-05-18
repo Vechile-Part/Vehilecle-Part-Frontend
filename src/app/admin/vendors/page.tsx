@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { apiFetch, extractApiError, parseJsonSafe } from "@/lib/http";
+import "../../../styles/pages/HistoryPage.css";
 
 type Vendor = {
   id: string;
@@ -49,7 +50,9 @@ const normalizeVendor = (record: Record<string, unknown>): Vendor => ({
 
 export default function AdminVendorsPage() {
   const [vendors, setVendors] = useState<Vendor[]>([]);
+  const ITEMS_PER_PAGE = 10;
   const [search, setSearch] = useState("");
+  const [currentPage, setCurrentPage] = useState(1);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [editMode, setEditMode] = useState(false);
@@ -90,6 +93,17 @@ export default function AdminVendorsPage() {
         vendor.phone.includes(term),
     );
   }, [search, vendors]);
+
+  const totalPages = Math.max(1, Math.ceil(filteredVendors.length / ITEMS_PER_PAGE));
+  const paginatedVendors = useMemo(() => {
+    const start = (currentPage - 1) * ITEMS_PER_PAGE;
+    return filteredVendors.slice(start, start + ITEMS_PER_PAGE);
+  }, [filteredVendors, currentPage]);
+
+  useEffect(() => {
+    // reset to first page when filter changes
+    setCurrentPage(1);
+  }, [search, vendors.length]);
 
   const openCreate = () => {
     setEditMode(false);
@@ -198,7 +212,12 @@ export default function AdminVendorsPage() {
 
       <header className="vendor-page-header">
         <MotionlessHeader />
-        <button type="button" className="form-button" onClick={openCreate} style={{ width: "auto", padding: "12px 28px" }}>
+        <button
+          type="button"
+          className="form-button"
+          onClick={openCreate}
+          style={{ width: "auto", padding: "12px 28px", margin: "12px 0" }}
+        >
           + Add vendor
         </button>
       </header>
@@ -209,10 +228,12 @@ export default function AdminVendorsPage() {
 
       <MotionlessTable
         loading={loading}
-        vendors={filteredVendors}
+        vendors={paginatedVendors}
         onEdit={openEdit}
         onDelete={handleDelete}
       />
+
+      <PaginationControls currentPage={currentPage} totalItems={filteredVendors.length} onPageChange={setCurrentPage} />
     </main>
   );
 }
@@ -259,8 +280,9 @@ function MotionlessTable({
   onDelete: (id: string) => void;
 }) {
   return (
-    <div className="vendor-table-card">
-      <table className="inventory-table">
+    <div className="form-card inventory-container vendor-table-card" style={{ maxWidth: "none", border: "1px solid #eadfcd", borderRadius: "12px", padding: 0, overflow: "hidden" }}>
+      <div className="inventory-table-scroll">
+        <table className="inventory-table">
         <thead style={{ background: "#f9f6f0" }}>
           <tr>
             <th style={{ padding: "16px 24px", textAlign: "left" }}>VENDOR</th>
@@ -297,20 +319,47 @@ function MotionlessTable({
                   </span>
                 </td>
                 <td style={{ padding: "18px 24px" }}>
-                  <div className="vendor-actions">
-                    <button type="button" className="edit" onClick={() => onEdit(vendor)}>
-                      Edit
-                    </button>
-                    <button type="button" className="delete" onClick={() => onDelete(vendor.id)}>
-                      Delete
-                    </button>
-                  </div>
+                  <button type="button" className="action-btn" style={{ color: "#3d2817", marginRight: 8 }} onClick={() => onEdit(vendor)}>
+                    Edit
+                  </button>
+                  <button type="button" className="action-btn" style={{ color: "#8f3d2b" }} onClick={() => onDelete(vendor.id)}>
+                    Delete
+                  </button>
                 </td>
               </tr>
             ))
           )}
         </tbody>
-      </table>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+function PaginationControls({ currentPage, totalItems, onPageChange }: {
+  currentPage: number;
+  totalItems: number;
+  onPageChange: (page: number) => void;
+}) {
+  const ITEMS_PER_PAGE = 10;
+  const totalPages = Math.ceil(totalItems / ITEMS_PER_PAGE);
+  if (totalPages <= 1) return null;
+
+  return (
+    <div style={{ display: "flex", justifyContent: "center", marginTop: "16px" }} className="pagination">
+      <button className="page-btn" disabled={currentPage === 1} onClick={() => onPageChange(currentPage - 1)}>
+        ← Prev
+      </button>
+
+      {Array.from({ length: totalPages }, (_, i) => (
+        <button key={i + 1} className={`page-btn ${currentPage === i + 1 ? "active-page" : ""}`} onClick={() => onPageChange(i + 1)}>
+          {i + 1}
+        </button>
+      ))}
+
+      <button className="page-btn" disabled={currentPage === totalPages} onClick={() => onPageChange(currentPage + 1)}>
+        Next →
+      </button>
     </div>
   );
 }
@@ -424,3 +473,5 @@ function MotionlessForm({
     </div>
   );
 }
+
+
