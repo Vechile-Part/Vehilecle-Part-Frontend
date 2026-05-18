@@ -73,9 +73,9 @@ const MAIN_NAV: NavItem[] = [
   {
     href: "/admin/customer-accounts",
     label: "Customers",
-    match: ["/admin/customer-accounts"],
+    match: ["/admin/customer-accounts", "/customers"],
     roles: ["admin"],
-    Icon: MdPeople,
+    Icon: FaUserFriends,
   },
   {
     href: "/admin/purchase-invoices",
@@ -98,13 +98,6 @@ const MAIN_NAV: NavItem[] = [
     match: ["/staff/invoices"],
     roles: ["admin", "staff"],
     Icon: MdReceiptLong,
-  },
-  {
-    href: "/customers",
-    label: "Customer directory",
-    match: ["/customers"],
-    roles: ["admin"],
-    Icon: FaUserFriends,
   },
   {
     href: "/staff/customers",

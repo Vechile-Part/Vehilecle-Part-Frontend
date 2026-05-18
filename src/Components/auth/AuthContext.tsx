@@ -36,7 +36,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
 
       // Extract details
-      const id = String(payload.nameid ?? payload.sub ?? payload.Id ?? "");
+      const id = String(payload.nameid ?? payload.sub ?? payload.Id ?? payload.UserId ?? payload.userId ?? payload.CustomerId ?? payload.customerId ?? "");
       const email = String(
         payload.email ??
         payload["http://schemas.xmlsoap.org/ws/2005/05/identity/claims/emailaddress"] ??

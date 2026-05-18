@@ -1,0 +1,12 @@
+.admin-customers-table-row {
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+}
+
+.admin-customers-table-row:hover {
+  background-color: #f5efe6;
+}
+
+.admin-customers-table-row.active {
+  background-color: #ebe2d6;
+}

@@ -70,7 +70,7 @@ export function readCustomerIdFromSession(): string {
     const normalized = payloadPart.replace(/-/g, "+").replace(/_/g, "/");
     const json = atob(normalized.padEnd(Math.ceil(normalized.length / 4) * 4, "="));
     const payload = JSON.parse(json) as Record<string, string>;
-    return payload.CustomerId || payload.customerId || payload.sub || payload.nameid || payload.userId || "";
+    return payload.CustomerId || payload.customerId || payload.sub || payload.nameid || payload.UserId || payload.userId || "";
   } catch {
     return "";
   }

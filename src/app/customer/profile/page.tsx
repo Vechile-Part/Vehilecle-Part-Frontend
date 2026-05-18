@@ -34,21 +34,13 @@ export default function CustomerProfilePage() {
 
   const loadProfileAndVehicles = async (id: string) => {
     localStorage.setItem("customerId", id);
-    const profileRes = await apiFetch(`/api/customers/${id}/profile`);
-    if (profileRes.ok) {
-      const data = await parseJsonSafe(profileRes);
-      if (data && typeof data === "object" && !Array.isArray(data)) {
-        const record = data as Record<string, unknown>;
-        setProfile({
-          id: String(record.id ?? record.customerId ?? ""),
-          fullName: String(record.fullName ?? record.name ?? ""),
-          phone: String(record.phone ?? record.phoneNumber ?? ""),
-          email: String(record.email ?? record.emailAddress ?? ""),
-        });
-      }
-    }
+    setLoading(true);
 
-    const vehiclesRes = await apiFetch(`/api/customers/${id}/vehicles`);
+    const [profileRes, vehiclesRes] = await Promise.all([
+      apiFetch(`/api/customers/${id}/profile`),
+      apiFetch(`/api/customers/${id}/vehicles`),
+    ]);
+
     if (vehiclesRes.ok) {
       const vehiclesData = await parseJsonSafe(vehiclesRes);
       if (Array.isArray(vehiclesData)) {
@@ -64,7 +56,19 @@ export default function CustomerProfilePage() {
       }
     }
 
-    setMessage("Profile loaded");
+    if (profileRes.ok) {
+      const data = await parseJsonSafe(profileRes);
+      if (data && typeof data === "object" && !Array.isArray(data)) {
+        const record = data as Record<string, unknown>;
+        setProfile({
+          id: String(record.id ?? record.customerId ?? ""),
+          fullName: String(record.fullName ?? record.name ?? ""),
+          phone: String(record.phone ?? record.phoneNumber ?? ""),
+          email: String(record.email ?? record.emailAddress ?? ""),
+        });
+      }
+    }
+
     setLoading(false);
   };
 
@@ -202,7 +206,7 @@ export default function CustomerProfilePage() {
       <section className="form-card">
         <h1 className="form-title">Customer Profile & Vehicles</h1>
         <p className="form-subtitle">Customer ID: {resolvedCustomerId}</p>
-        <motion.div className="form-grid">
+        <div className="form-grid">
           <input
             className="form-input"
             placeholder="Full Name"
@@ -251,13 +255,13 @@ export default function CustomerProfilePage() {
         {vehicles.length === 0 ? (
           <p className="form-message">No vehicles found.</p>
         ) : (
-          <motion.div className="form-grid">
+          <div className="form-grid">
             {vehicles.map((v) => (
               <div key={v.id} className="result-pre">
                 <p>
                   <strong>{v.vehicleNumber}</strong> - {v.make} {v.model} ({v.year})
                 </p>
-                <motion.div style={{ display: "flex", gap: "8px", flexWrap: "wrap", marginTop: "8px" }}>
+                <div style={{ display: "flex", gap: "8px", flexWrap: "wrap", marginTop: "8px" }}>
                   <button
                     type="button"
                     className="form-button secondary"
@@ -271,7 +275,7 @@ export default function CustomerProfilePage() {
                 </div>
               </div>
             ))}
-          </motion.div>
+          </div>
         )}
 
         <h2 className="form-section-title">Maintenance reminders</h2>
