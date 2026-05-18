@@ -1,12 +1,11 @@
 import { API_BASE_URL } from "@/lib/api";
+import { getAuthToken } from "@/lib/session";
 
 export const authHeaders = (json = false): Record<string, string> => {
   const headers: Record<string, string> = { Accept: "application/json" };
   if (json) headers["Content-Type"] = "application/json";
-  if (typeof window !== "undefined") {
-    const token = localStorage.getItem("authToken");
-    if (token) headers.Authorization = `Bearer ${token}`;
-  }
+  const token = getAuthToken();
+  if (token) headers.Authorization = `Bearer ${token}`;
   return headers;
 };
 
@@ -37,11 +36,9 @@ export async function apiFetch(path: string, init: RequestInit = {}): Promise<Re
   if (init.body && typeof init.body === "string" && !headers.has("Content-Type")) {
     headers.set("Content-Type", "application/json");
   }
-  if (typeof window !== "undefined") {
-    const token = localStorage.getItem("authToken");
-    if (token && !headers.has("Authorization")) {
-      headers.set("Authorization", `Bearer ${token}`);
-    }
+  const token = getAuthToken();
+  if (token && !headers.has("Authorization")) {
+    headers.set("Authorization", `Bearer ${token}`);
   }
   return fetch(apiUrl(path), { ...init, headers });
 }

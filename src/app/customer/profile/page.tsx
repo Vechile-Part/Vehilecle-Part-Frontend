@@ -11,11 +11,11 @@ import {
 
 type VehicleItem = { id: string; vehicleNumber: string; make: string; model: string; year: number };
 
-type VehicleHealthInsight = {
+type VehicleMaintenanceReminder = {
   partName: string;
-  riskLevel: number;
+  priority: string;
   recommendation: string;
-  daysRemaining: string;
+  suggestedActionBy: string;
 };
 
 export default function CustomerProfilePage() {
@@ -26,9 +26,9 @@ export default function CustomerProfilePage() {
   const [passwordForm, setPasswordForm] = useState({ currentPassword: "", newPassword: "" });
   const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(true);
-  const [healthVehicleId, setHealthVehicleId] = useState("");
-  const [healthLoading, setHealthLoading] = useState(false);
-  const [healthInsights, setHealthInsights] = useState<VehicleHealthInsight[]>([]);
+  const [reminderVehicleId, setReminderVehicleId] = useState("");
+  const [remindersLoading, setRemindersLoading] = useState(false);
+  const [maintenanceReminders, setMaintenanceReminders] = useState<VehicleMaintenanceReminder[]>([]);
 
   const resolvedCustomerId = useMemo(() => customerId || profile.id, [customerId, profile.id]);
 
@@ -132,32 +132,34 @@ export default function CustomerProfilePage() {
     }
   };
 
-  const loadVehicleHealth = async (vehicleId: string) => {
-    setHealthVehicleId(vehicleId);
-    setHealthLoading(true);
-    setHealthInsights([]);
+  const loadMaintenanceReminders = async (vehicleId: string) => {
+    setReminderVehicleId(vehicleId);
+    setRemindersLoading(true);
+    setMaintenanceReminders([]);
     try {
-      const res = await apiFetch(`/api/customers/vehicles/${vehicleId}/ai-health`);
+      const res = await apiFetch(`/api/customers/vehicles/${vehicleId}/maintenance-reminders`);
       const data = await parseJsonSafe(res);
       if (res.ok && Array.isArray(data)) {
-        setHealthInsights(
+        setMaintenanceReminders(
           data.map((row) => {
             const record = row as Record<string, unknown>;
             return {
-              partName: String(record.partName ?? record.PartName ?? "Part"),
-              riskLevel: Number(record.riskLevel ?? record.RiskLevel ?? 0),
+              partName: String(record.partName ?? record.PartName ?? "Service item"),
+              priority: String(record.priority ?? record.Priority ?? "Low"),
               recommendation: String(record.recommendation ?? record.Recommendation ?? ""),
-              daysRemaining: String(record.daysRemaining ?? record.DaysRemaining ?? ""),
+              suggestedActionBy: String(
+                record.suggestedActionBy ?? record.SuggestedActionBy ?? "",
+              ),
             };
           }),
         );
       } else {
-        setMessage(extractApiError(data, "Could not load vehicle health insights."));
+        setMessage(extractApiError(data, "Could not load maintenance reminders."));
       }
     } catch {
-      setMessage("Network error while loading vehicle health.");
+      setMessage("Network error while loading maintenance reminders.");
     } finally {
-      setHealthLoading(false);
+      setRemindersLoading(false);
     }
   };
 
@@ -200,7 +202,7 @@ export default function CustomerProfilePage() {
       <section className="form-card">
         <h1 className="form-title">Customer Profile & Vehicles</h1>
         <p className="form-subtitle">Customer ID: {resolvedCustomerId}</p>
-        <div className="form-grid">
+        <motion.div className="form-grid">
           <input
             className="form-input"
             placeholder="Full Name"
@@ -249,15 +251,19 @@ export default function CustomerProfilePage() {
         {vehicles.length === 0 ? (
           <p className="form-message">No vehicles found.</p>
         ) : (
-          <div className="form-grid">
+          <motion.div className="form-grid">
             {vehicles.map((v) => (
               <div key={v.id} className="result-pre">
                 <p>
                   <strong>{v.vehicleNumber}</strong> - {v.make} {v.model} ({v.year})
                 </p>
-                <div style={{ display: "flex", gap: "8px", flexWrap: "wrap", marginTop: "8px" }}>
-                  <button type="button" className="form-button secondary" onClick={() => void loadVehicleHealth(v.id)}>
-                    View health insights
+                <motion.div style={{ display: "flex", gap: "8px", flexWrap: "wrap", marginTop: "8px" }}>
+                  <button
+                    type="button"
+                    className="form-button secondary"
+                    onClick={() => void loadMaintenanceReminders(v.id)}
+                  >
+                    View maintenance reminders
                   </button>
                   <button type="button" className="form-button secondary" onClick={() => void deleteVehicle(v.id)}>
                     Delete Vehicle
@@ -265,27 +271,31 @@ export default function CustomerProfilePage() {
                 </div>
               </div>
             ))}
-          </div>
+          </motion.div>
         )}
 
-        <h2 className="form-section-title">Vehicle health insights</h2>
-        {healthLoading ? (
-          <p className="form-message">Loading health analysis…</p>
-        ) : healthInsights.length === 0 ? (
+        <h2 className="form-section-title">Maintenance reminders</h2>
+        <p className="form-subtitle" style={{ marginTop: 0 }}>
+          Based on your purchase history and vehicle registration year.
+        </p>
+        {remindersLoading ? (
+          <p className="form-message">Loading reminders…</p>
+        ) : maintenanceReminders.length === 0 ? (
           <p className="form-message">
-            {healthVehicleId
-              ? "No insights returned for this vehicle."
-              : "Select a vehicle above to view maintenance recommendations."}
+            {reminderVehicleId
+              ? "No reminders returned for this vehicle."
+              : "Select a vehicle above to review suggested maintenance."}
           </p>
         ) : (
           <div className="form-grid">
-            {healthInsights.map((insight) => (
-              <article key={insight.partName} className="result-pre">
-                <p style={{ margin: "0 0 6px", fontWeight: 700 }}>{insight.partName}</p>
+            {maintenanceReminders.map((reminder) => (
+              <article key={`${reminder.partName}-${reminder.suggestedActionBy}`} className="result-pre">
+                <p style={{ margin: "0 0 6px", fontWeight: 700 }}>{reminder.partName}</p>
                 <p style={{ margin: "0 0 4px", fontSize: "13px" }}>
-                  Risk: {Math.round(insight.riskLevel * 100)}% · Due in {insight.daysRemaining}
+                  Priority: {reminder.priority}
+                  {reminder.suggestedActionBy ? ` · ${reminder.suggestedActionBy}` : ""}
                 </p>
-                <p style={{ margin: 0, fontSize: "14px", color: "#5a4733" }}>{insight.recommendation}</p>
+                <p style={{ margin: 0, fontSize: "14px", color: "#5a4733" }}>{reminder.recommendation}</p>
               </article>
             ))}
           </div>

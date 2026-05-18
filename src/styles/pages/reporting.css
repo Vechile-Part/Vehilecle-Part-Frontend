@@ -376,3 +376,128 @@
     cursor: default;
     opacity: 0.75;
 }
+
+/* Staff customer reports */
+.staff-reports-page {
+    width: 100%;
+    max-width: 1280px;
+}
+
+.staff-reports-hero {
+    padding: 24px 26px;
+    border: 1px solid #e0d0b8;
+    border-radius: 22px;
+    background: linear-gradient(135deg, #fffaf1 0%, #f8efe0 100%);
+}
+
+.financial-reports-hero-text {
+    display: grid;
+    gap: 8px;
+}
+
+.staff-reports-kpi-row .staff-reports-kpi {
+    background: #fffdf8;
+    border: 1px solid #eadfcd;
+    border-radius: 16px;
+    padding: 18px 20px;
+}
+
+.staff-reports-panel {
+    padding: 0;
+    overflow: hidden;
+}
+
+.staff-reports-table-head {
+    flex-wrap: wrap;
+    align-items: flex-start;
+    gap: 16px;
+    padding: 20px 22px 0;
+}
+
+.staff-reports-table-wrap {
+    padding: 0 22px 22px;
+}
+
+.staff-reports-table th {
+    white-space: nowrap;
+}
+
+.staff-reports-customer-cell {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    min-width: 160px;
+}
+
+.staff-reports-avatar {
+    flex-shrink: 0;
+    width: 40px;
+    height: 40px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 12px;
+    background: #2a1c0f;
+    color: #fff9ef;
+    font-size: 0.8rem;
+    font-weight: 700;
+}
+
+.staff-reports-customer-link {
+    font-weight: 700;
+    color: #2a1d0f;
+    text-decoration: none;
+}
+
+.staff-reports-customer-link:hover {
+    text-decoration: underline;
+    text-underline-offset: 3px;
+}
+
+.staff-reports-tab-count {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 1.35rem;
+    margin-left: 6px;
+    padding: 0 6px;
+    border-radius: 999px;
+    background: rgba(42, 28, 15, 0.08);
+    font-size: 0.78rem;
+    font-weight: 700;
+}
+
+.financial-reports-segment-btn.active .staff-reports-tab-count {
+    background: #ead9c3;
+}
+
+.staff-reports-empty {
+    margin: 0;
+    padding: 28px 22px 32px;
+    text-align: center;
+    color: #8a7559;
+    font-size: 0.95rem;
+    line-height: 1.55;
+}
+
+@media (max-width: 900px) {
+    .financial-reports-segment {
+        flex-wrap: wrap;
+        width: 100%;
+    }
+
+    .financial-reports-segment-btn {
+        flex: 1 1 auto;
+        min-width: 0;
+        font-size: 0.82rem;
+        padding: 8px 12px;
+    }
+
+    .staff-reports-table-wrap {
+        overflow-x: auto;
+    }
+
+    .staff-reports-table {
+        min-width: 720px;
+    }
+}

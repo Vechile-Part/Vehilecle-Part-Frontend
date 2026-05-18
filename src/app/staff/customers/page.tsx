@@ -2,9 +2,9 @@
 
 import { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { FiClock, FiDownload, FiFilter, FiMail, FiMapPin, FiPhone, FiSearch, FiTruck } from "react-icons/fi";
+import { FiClock, FiDownload, FiFilter, FiMail, FiPhone, FiSearch, FiTruck, FiX } from "react-icons/fi";
 import { formatNpr } from "@/lib/currency";
-import { apiFetch } from "@/lib/http";
+import { apiFetch, isUuid } from "@/lib/http";
 
 const PAGE_SIZE = 4;
 
@@ -141,17 +141,33 @@ const extractRecords = (data: unknown, keys: string[] = ["items", "customers", "
 };
 
 const normalizeSearchCustomers = (data: unknown): SearchCustomer[] =>
-  extractRecords(data).map((record, index) => ({
-    id: readString(record.id ?? record.customerId ?? record.userId, `customer-${index}`),
-    fullName: readString(record.fullName ?? record.name ?? record.customerName, "Customer record"),
-    phone: readString(record.phone ?? record.phoneNumber ?? record.mobile, "No phone on file"),
-    email: readString(record.email ?? record.emailAddress, "No email on file"),
-    vehicleNumber: readString(record.vehicleNumber ?? record.registrationNumber ?? record.licensePlate),
-    make: readString(record.make ?? record.vehicleMake ?? record.brand),
-    model: readString(record.model ?? record.vehicleModel ?? record.variant),
-    year: readNumber(record.year ?? record.vehicleYear),
-    address: readString(record.address ?? record.shippingAddress ?? record.defaultAddress),
-  }));
+  extractRecords(data).map((record, index) => {
+    const nestedVehicles = extractRecords(record.vehicles ?? record.Vehicles);
+    const firstVehicle = nestedVehicles[0];
+
+    return {
+      id: readString(record.id ?? record.customerId ?? record.userId, `customer-${index}`),
+      fullName: readString(record.fullName ?? record.name ?? record.customerName, "Customer record"),
+      phone: readString(record.phone ?? record.phoneNumber ?? record.mobile, "No phone on file"),
+      email: readString(record.email ?? record.emailAddress, "No email on file"),
+      vehicleNumber: readString(
+        record.vehicleNumber ??
+          record.VehicleNumber ??
+          firstVehicle?.vehicleNumber ??
+          firstVehicle?.VehicleNumber ??
+          record.registrationNumber ??
+          record.licensePlate,
+      ),
+      make: readString(
+        record.make ?? record.Make ?? firstVehicle?.make ?? firstVehicle?.Make ?? record.vehicleMake ?? record.brand,
+      ),
+      model: readString(
+        record.model ?? record.Model ?? firstVehicle?.model ?? firstVehicle?.Model ?? record.vehicleModel ?? record.variant,
+      ),
+      year: readNumber(record.year ?? record.Year ?? firstVehicle?.year ?? firstVehicle?.Year ?? record.vehicleYear),
+      address: readString(record.address ?? record.shippingAddress ?? record.defaultAddress),
+    };
+  });
 
 const normalizeProfile = (data: unknown, fallback: SearchCustomer | undefined): CustomerProfile => {
   const record = isRecord(data) ? data : {};
@@ -221,6 +237,14 @@ const dedupeCustomers = (customers: SearchCustomer[]) => {
   });
 };
 
+/** UI shows plates as "BA 66 pa 6815 | 2025" — search only the plate portion. */
+const normalizeVehicleSearchTerm = (query: string) => {
+  const trimmed = query.trim();
+  const pipeYear = trimmed.match(/^(.+?)\s*\|\s*\d{4}\s*$/);
+  if (pipeYear) return pipeYear[1].trim();
+  return trimmed;
+};
+
 const sanitizeApiMessage = (message: string) =>
   message.replace(/\s*POSITION:[\s\S]*$/, "").replace(/\s+/g, " ").trim();
 
@@ -233,14 +257,7 @@ const readApiErrorMessage = (data: unknown, status: number, fallback: string) =>
   return `${fallback} (HTTP ${status})`;
 };
 
-const searchByField = async (field: "fullName" | "phone" | "vehicleNumber", query: string): Promise<SearchResult> => {
-  const params = new URLSearchParams({
-    fullName: "",
-    phone: "",
-    vehicleNumber: "",
-  });
-  params.set(field, query);
-
+const searchCustomersApi = async (params: URLSearchParams): Promise<SearchResult> => {
   const response = await apiFetch(`/api/staff/customers/search?${params.toString()}`);
   const data = await parseJsonSafe(response);
 
@@ -257,6 +274,26 @@ const searchByField = async (field: "fullName" | "phone" | "vehicleNumber", quer
   };
 };
 
+const searchByField = async (field: "fullName" | "phone" | "vehicleNumber", query: string): Promise<SearchResult> => {
+  const params = new URLSearchParams({
+    fullName: "",
+    phone: "",
+    vehicleNumber: "",
+  });
+  params.set(field, query);
+  return searchCustomersApi(params);
+};
+
+const searchByCustomerId = async (customerId: string): Promise<SearchResult> => {
+  const params = new URLSearchParams({
+    fullName: "",
+    phone: "",
+    vehicleNumber: "",
+    customerId,
+  });
+  return searchCustomersApi(params);
+};
+
 const getHistoryTone = (invoice: PurchaseInvoice) => invoice.statusTone ?? "delivered";
 
 const getHistoryStatusClass = (invoice: PurchaseInvoice) => {
@@ -271,8 +308,20 @@ function StaffCustomersPageContent() {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const searchInputRef = useRef<HTMLInputElement>(null);
+  const searchGenerationRef = useRef(0);
+  const detailsRequestIdRef = useRef(0);
   const directoryBasePath = pathname?.startsWith("/staff") ? "/staff/customers" : "/customers";
-  const queryFromUrl = (searchParams.get("q") ?? "").trim();
+  const rawCustomerIdParam = (searchParams.get("customerId") ?? "").trim();
+  const rawQueryParam = (searchParams.get("q") ?? "").trim();
+  const hasInvalidCustomerIdParam = rawCustomerIdParam.length > 0 && !isUuid(rawCustomerIdParam);
+  const customerIdFromUrl = isUuid(rawCustomerIdParam)
+    ? rawCustomerIdParam
+    : isUuid(rawQueryParam)
+      ? rawQueryParam
+      : "";
+  const textQueryFromUrl = isUuid(rawQueryParam) ? "" : rawQueryParam;
+  const searchInputDefault = customerIdFromUrl || textQueryFromUrl;
+  const searchLabel = searchInputDefault;
 
   const [directory, setDirectory] = useState<SearchCustomer[]>([]);
   const [selectedCustomerId, setSelectedCustomerId] = useState("");
@@ -286,6 +335,7 @@ function StaffCustomersPageContent() {
   const [detailError, setDetailError] = useState<string | null>(null);
   const [isSearching, setIsSearching] = useState(false);
   const [isLoadingDetails, setIsLoadingDetails] = useState(false);
+  const [detailModalOpen, setDetailModalOpen] = useState(false);
 
   const selectedSummary = useMemo(
     () => directory.find((customer) => customer.id === selectedCustomerId) ?? EMPTY_CUSTOMER,
@@ -294,30 +344,80 @@ function StaffCustomersPageContent() {
 
   useEffect(() => {
     const performSearch = async () => {
+      const searchGeneration = ++searchGenerationRef.current;
+
       setIsSearching(true);
       setSearchError(null);
       setDetailError(null);
+      setDirectory([]);
+      setSelectedCustomerId("");
+      setProfile(EMPTY_PROFILE);
+      setVehicles([]);
+      setHistory([]);
 
       try {
+        if (hasInvalidCustomerIdParam) {
+          setDirectory([]);
+          setSelectedCustomerId("");
+          setProfile(EMPTY_PROFILE);
+          setVehicles([]);
+          setHistory([]);
+          setFilterMode("all");
+          setHistoryPage(1);
+          setDirectoryMode("live-error");
+          setSearchError(
+            "Customer ID must be a valid GUID (for example: 3fa85f64-5717-4562-b3fc-2c963f66afa6).",
+          );
+          return;
+        }
+
+        if (!customerIdFromUrl && !textQueryFromUrl) {
+          setDirectory([]);
+          setSelectedCustomerId("");
+          setProfile(EMPTY_PROFILE);
+          setVehicles([]);
+          setHistory([]);
+          setFilterMode("all");
+          setHistoryPage(1);
+          setDirectoryMode("no-results");
+          setSearchError(null);
+          return;
+        }
+
         const matches: SearchCustomer[] = [];
         const errors: string[] = [];
 
-        const nameSearch = await searchByField("fullName", queryFromUrl);
-        matches.push(...nameSearch.customers);
-        if (nameSearch.error) errors.push(nameSearch.error);
+        if (customerIdFromUrl) {
+          const idSearch = await searchByCustomerId(customerIdFromUrl);
+          if (searchGeneration !== searchGenerationRef.current) return;
+          matches.push(...idSearch.customers);
+          if (idSearch.error) errors.push(idSearch.error);
+        } else {
+          const vehicleTerm = normalizeVehicleSearchTerm(textQueryFromUrl);
 
-        if (/\d/.test(queryFromUrl)) {
-          const phoneSearch = await searchByField("phone", queryFromUrl);
-          matches.push(...phoneSearch.customers);
-          if (phoneSearch.error) errors.push(phoneSearch.error);
+          const nameSearch = await searchByField("fullName", textQueryFromUrl);
+          if (searchGeneration !== searchGenerationRef.current) return;
+          matches.push(...nameSearch.customers);
+          if (nameSearch.error) errors.push(nameSearch.error);
 
-          const vehicleSearch = await searchByField("vehicleNumber", queryFromUrl);
-          matches.push(...vehicleSearch.customers);
-          if (vehicleSearch.error) errors.push(vehicleSearch.error);
+          if (/\d/.test(textQueryFromUrl)) {
+            const phoneSearch = await searchByField("phone", textQueryFromUrl);
+            if (searchGeneration !== searchGenerationRef.current) return;
+            matches.push(...phoneSearch.customers);
+            if (phoneSearch.error) errors.push(phoneSearch.error);
+          }
+
+          if (vehicleTerm.length >= 2) {
+            const vehicleSearch = await searchByField("vehicleNumber", vehicleTerm);
+            if (searchGeneration !== searchGenerationRef.current) return;
+            matches.push(...vehicleSearch.customers);
+            if (vehicleSearch.error) errors.push(vehicleSearch.error);
+          }
         }
 
         const uniqueMatches = dedupeCustomers(matches);
         const firstError = errors[0] ?? null;
+        const openDetailsForMatch = Boolean(customerIdFromUrl) && uniqueMatches.length === 1;
 
         if (uniqueMatches.length === 0) {
           setDirectory([]);
@@ -329,11 +429,18 @@ function StaffCustomersPageContent() {
           setHistoryPage(1);
           setDirectoryMode(firstError ? "live-error" : "no-results");
           setSearchError(firstError);
+          setDetailModalOpen(false);
           return;
         }
 
         setDirectory(uniqueMatches);
-        setSelectedCustomerId(uniqueMatches[0].id);
+        if (openDetailsForMatch) {
+          setSelectedCustomerId(uniqueMatches[0].id);
+          setDetailModalOpen(true);
+        } else {
+          setSelectedCustomerId("");
+          setDetailModalOpen(false);
+        }
         setFilterMode("all");
         setHistoryPage(1);
         setDirectoryMode("live-results");
@@ -354,50 +461,126 @@ function StaffCustomersPageContent() {
     };
 
     void performSearch();
-  }, [queryFromUrl]);
+  }, [customerIdFromUrl, textQueryFromUrl, hasInvalidCustomerIdParam]);
 
   useEffect(() => {
-    const loadCustomerDetails = async () => {
-      if (!selectedCustomerId) {
+    const customerId = selectedCustomerId;
+
+    if (!customerId || !detailModalOpen) {
+      if (!customerId) {
         setProfile(EMPTY_PROFILE);
         setVehicles([]);
         setHistory([]);
         setDetailError(null);
         setIsLoadingDetails(false);
-        return;
       }
+      return;
+    }
 
+    const requestId = ++detailsRequestIdRef.current;
+    const summary = directory.find((customer) => customer.id === customerId) ?? EMPTY_CUSTOMER;
+
+    const loadCustomerDetails = async () => {
       setIsLoadingDetails(true);
       setDetailError(null);
 
       try {
-        const detailsResponse = await apiFetch(`/api/staff/customers/${selectedCustomerId}`);
+        const detailsResponse = await apiFetch(`/api/staff/customers/${customerId}`);
         const detailsData = await parseJsonSafe(detailsResponse);
 
+        if (requestId !== detailsRequestIdRef.current) return;
+
         if (!detailsResponse.ok) {
-          setProfile(normalizeProfile(null, selectedSummary));
+          setProfile(normalizeProfile(null, summary));
           setVehicles([]);
           setHistory([]);
-          setDetailError(readApiErrorMessage(detailsData, detailsResponse.status, "Unable to load the selected customer record."));
+          setDetailError(
+            readApiErrorMessage(detailsData, detailsResponse.status, "Unable to load the selected customer record."),
+          );
           return;
         }
 
         const detailsRecord = isRecord(detailsData) ? detailsData : {};
-        setProfile(normalizeProfile(detailsRecord, selectedSummary));
-        setVehicles(normalizeVehicles(detailsRecord.vehicles));
+        setProfile(normalizeProfile(detailsRecord, summary));
+        const loadedVehicles = normalizeVehicles(detailsRecord.vehicles ?? detailsRecord.Vehicles);
+        setVehicles(loadedVehicles);
         setHistory(normalizeHistory(detailsRecord.invoices ?? detailsRecord.history ?? detailsRecord.purchases));
+
+        const primary = loadedVehicles[0];
+        if (primary?.vehicleNumber) {
+          setDirectory((prev) => {
+            const index = prev.findIndex((customer) => customer.id === customerId);
+            if (index < 0) return prev;
+
+            const existing = prev[index];
+            if (
+              existing.vehicleNumber === primary.vehicleNumber &&
+              existing.make === primary.make &&
+              existing.model === primary.model &&
+              existing.year === primary.year
+            ) {
+              return prev;
+            }
+
+            const next = [...prev];
+            next[index] = {
+              ...existing,
+              vehicleNumber: primary.vehicleNumber,
+              make: primary.make,
+              model: primary.model,
+              year: primary.year,
+            };
+            return next;
+          });
+        }
       } catch {
-        setProfile(normalizeProfile(null, selectedSummary));
+        if (requestId !== detailsRequestIdRef.current) return;
+        setProfile(normalizeProfile(null, summary));
         setVehicles([]);
         setHistory([]);
         setDetailError("Unable to load the selected customer record.");
       } finally {
-        setIsLoadingDetails(false);
+        if (requestId === detailsRequestIdRef.current) {
+          setIsLoadingDetails(false);
+        }
       }
     };
 
     void loadCustomerDetails();
-  }, [selectedCustomerId, selectedSummary]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- directory read for fallback only; do not refetch when directory updates
+  }, [selectedCustomerId, detailModalOpen]);
+
+  const openCustomerModal = (customerId: string) => {
+    setSelectedCustomerId(customerId);
+    setFilterMode("all");
+    setHistoryPage(1);
+    setDetailModalOpen(true);
+  };
+
+  const closeCustomerModal = () => {
+    detailsRequestIdRef.current += 1;
+    setDetailModalOpen(false);
+    setSelectedCustomerId("");
+    setDetailError(null);
+    setIsLoadingDetails(false);
+  };
+
+  useEffect(() => {
+    if (!detailModalOpen) return;
+
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") closeCustomerModal();
+    };
+
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    window.addEventListener("keydown", onKeyDown);
+
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener("keydown", onKeyDown);
+    };
+  }, [detailModalOpen]);
 
   const filteredHistory = useMemo(() => {
     if (filterMode === "all") return history;
@@ -426,14 +609,16 @@ function StaffCustomersPageContent() {
   const pageStatus = isSearching
     ? {
         tone: "info",
-        text: `Searching live customer records for "${queryFromUrl}"...`,
+        text: customerIdFromUrl
+          ? `Looking up customer ID ${customerIdFromUrl}...`
+          : `Searching live customer records for "${searchLabel}"...`,
       }
     : directoryMode === "live-results"
       ? {
           tone: detailError ? "error" : "success",
           text: detailError
-            ? `Found ${directory.length} customer record${directory.length === 1 ? "" : "s"}${queryFromUrl ? ` for "${queryFromUrl}"` : ""}, but the full customer details could not be loaded: ${detailError}`
-            : `Loaded ${directory.length} customer record${directory.length === 1 ? "" : "s"}${queryFromUrl ? ` for "${queryFromUrl}"` : ""}.`,
+            ? `Found ${directory.length} customer record${directory.length === 1 ? "" : "s"}${searchLabel ? ` for "${searchLabel}"` : ""}, but the full customer details could not be loaded: ${detailError}`
+            : `Loaded ${directory.length} customer record${directory.length === 1 ? "" : "s"}${searchLabel ? ` for "${searchLabel}"` : ""}.`,
         }
       : directoryMode === "live-error"
       ? {
@@ -442,9 +627,9 @@ function StaffCustomersPageContent() {
         }
       : {
           tone: "info",
-          text: queryFromUrl
-            ? `No live customer record matched "${queryFromUrl}".`
-            : "Loaded the live customer directory.",
+          text: searchLabel
+            ? `No live customer record matched "${searchLabel}".`
+            : "Search by customer name, phone, vehicle number, or customer ID (GUID).",
         };
 
   const pageCount = Math.max(1, Math.ceil(filteredHistory.length / PAGE_SIZE));
@@ -479,9 +664,6 @@ function StaffCustomersPageContent() {
     URL.revokeObjectURL(url);
   };
 
-  const addressText =
-    profile.address || selectedSummary.address || "No address available in this customer record yet.";
-
   return (
     <section className="customer-directory-page">
       <header className="customer-directory-header">
@@ -489,8 +671,8 @@ function StaffCustomersPageContent() {
           <p className="customer-directory-kicker">Staff Customer Directory</p>
           <h1 className="customer-directory-title">View customer details, purchase history, and vehicle information.</h1>
           <p className="customer-directory-description">
-            Search by customer name, phone number, or vehicle number to open a customer record and review the latest
-            customer activity.
+            Search by customer name, phone number, vehicle number, or customer ID (GUID), then click a match to open
+            their full record in a modal.
           </p>
         </div>
 
@@ -499,20 +681,28 @@ function StaffCustomersPageContent() {
           onSubmit={(event) => {
             event.preventDefault();
             const query = searchInputRef.current?.value.trim() ?? "";
-            router.push(
-              query ? `${directoryBasePath}?q=${encodeURIComponent(query)}` : directoryBasePath,
-            );
+            if (!query) {
+              router.push(directoryBasePath);
+              return;
+            }
+            if (isUuid(query)) {
+              router.push(`${directoryBasePath}?customerId=${encodeURIComponent(query)}`);
+              return;
+            }
+            router.push(`${directoryBasePath}?q=${encodeURIComponent(query)}`);
           }}
         >
           <div className="customer-directory-search-input-wrap">
             <FiSearch size={18} />
             <input
-              key={queryFromUrl}
+              key={searchInputDefault}
               ref={searchInputRef}
-              defaultValue={queryFromUrl}
-              type="text"
+              defaultValue={searchInputDefault}
+              type="search"
               className="customer-directory-search-input"
-              placeholder="Find customer by name, phone, or vehicle number..."
+              placeholder="Name, phone, vehicle number, or customer ID (GUID)..."
+              spellCheck={false}
+              autoComplete="off"
             />
           </div>
           <button className="customer-directory-search-button" type="submit" disabled={isSearching}>
@@ -542,16 +732,17 @@ function StaffCustomersPageContent() {
               <button
                 key={customer.id}
                 type="button"
-                className={`customer-directory-match-card ${customer.id === selectedCustomerId ? "active" : ""}`}
-                onClick={() => {
-                  setSelectedCustomerId(customer.id);
-                  setFilterMode("all");
-                  setHistoryPage(1);
-                }}
+                className={`customer-directory-match-card ${customer.id === selectedCustomerId && detailModalOpen ? "active" : ""}`}
+                onClick={() => openCustomerModal(customer.id)}
               >
                 <div className="customer-directory-match-avatar">{initialsFromName(customer.fullName)}</div>
                 <div className="customer-directory-match-meta">
                   <strong>{customer.fullName}</strong>
+                  {customer.id && !customer.id.startsWith("customer-") ? (
+                    <span className="customer-directory-match-id" title="Customer ID">
+                      ID: {customer.id}
+                    </span>
+                  ) : null}
                   <span>{customer.phone}</span>
                   <span>
                     {customer.vehicleNumber || "Vehicle not listed"}
@@ -564,6 +755,41 @@ function StaffCustomersPageContent() {
         </div>
       </section>
 
+      {detailModalOpen && selectedCustomerId ? (
+        <div
+          className="modal-overlay customer-directory-modal-overlay"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="customer-detail-modal-title"
+          onClick={closeCustomerModal}
+        >
+          <div
+            className="modal-container customer-directory-modal"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="customer-directory-modal-toolbar">
+              <div>
+                <p className="customer-directory-modal-kicker">Customer record</p>
+                <h2 id="customer-detail-modal-title" className="customer-directory-modal-title">
+                  {selectedSummary.fullName || profile.fullName}
+                </h2>
+              </div>
+              <button
+                type="button"
+                className="customer-directory-modal-close"
+                onClick={closeCustomerModal}
+                aria-label="Close customer details"
+              >
+                <FiX size={22} />
+              </button>
+            </div>
+
+            {isLoadingDetails ? (
+              <div className="customer-directory-modal-loading">Loading customer details…</div>
+            ) : detailError ? (
+              <div className={`customer-directory-status error customer-directory-modal-error`}>{detailError}</div>
+            ) : (
+              <div className="customer-directory-modal-body">
       <div className="customer-directory-top-grid">
         <article
           className="customer-directory-profile-card"
@@ -617,16 +843,6 @@ function StaffCustomersPageContent() {
             </div>
           </article>
 
-          <article className="customer-directory-wide-card">
-            <div className="customer-directory-info-icon soft">
-              <FiMapPin size={22} />
-            </div>
-            <div className="customer-directory-wide-card-copy">
-              <p className="customer-directory-info-label">Default Address</p>
-              <strong>{addressText}</strong>
-              <span>Staff can verify delivery, billing, and registration details from this record.</span>
-            </div>
-          </article>
 
           <article className="customer-directory-summary-card">
             <div className="customer-directory-summary-metrics">
@@ -819,6 +1035,11 @@ function StaffCustomersPageContent() {
           </div>
         </aside>
       </div>
+              </div>
+            )}
+          </div>
+        </div>
+      ) : null}
     </section>
   );
 }

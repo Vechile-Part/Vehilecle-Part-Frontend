@@ -1,16 +1,26 @@
 "use client";
 
 import { useEffect } from "react";
-import { persistAuthSession } from "@/lib/session";
+import { getAuthToken, persistAuthSession, readAuthTokenFromCookie } from "@/lib/session";
 
-/** Keeps middleware auth cookie in sync when only localStorage was set (legacy sessions). */
+/** Keeps auth cookie and localStorage in sync for API calls and middleware. */
 export default function AuthSessionSync() {
   useEffect(() => {
-    const token = localStorage.getItem("authToken");
-    if (!token) return;
-    if (document.cookie.includes("authToken=")) return;
+    const stored = localStorage.getItem("authToken");
+    const fromCookie = readAuthTokenFromCookie();
     const customerId = localStorage.getItem("customerId");
-    persistAuthSession(token, customerId);
+
+    if (stored?.includes(".") && !fromCookie) {
+      persistAuthSession(stored, customerId);
+      return;
+    }
+
+    if (fromCookie?.includes(".") && !stored?.includes(".")) {
+      persistAuthSession(fromCookie, customerId);
+      return;
+    }
+
+    getAuthToken();
   }, []);
 
   return null;

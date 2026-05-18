@@ -1,9 +1,10 @@
 "use client";
 
 import Image from "next/image";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { formatNpr } from "@/lib/currency";
 import { apiFetch, extractApiError, isUuid, parseJsonSafe } from "@/lib/http";
+import { partImageUrl, uploadPartImage } from "@/lib/partImage";
 
 type Part = {
   id: string;
@@ -108,10 +109,19 @@ export default function AdminPartsPage() {
   const [filterLowStock, setFilterLowStock] = useState(false);
 
   const [form, setForm] = useState<PartForm>(emptyForm);
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [imageVersion, setImageVersion] = useState(0);
+  const imageInputRef = useRef<HTMLInputElement>(null);
 
-  const [page, setPage] = useState(1);
-  const [pageSize] = useState(10);
-  const [totalCount, setTotalCount] = useState(0);
+  const clearImageSelection = useCallback(() => {
+    setImagePreview((prev) => {
+      if (prev?.startsWith("blob:")) URL.revokeObjectURL(prev);
+      return null;
+    });
+    setImageFile(null);
+    if (imageInputRef.current) imageInputRef.current.value = "";
+  }, []);
 
   const loadVendors = useCallback(async () => {
     try {
@@ -134,7 +144,7 @@ export default function AdminPartsPage() {
     setStatus(null);
     try {
       const [partsRes, vendorsRes] = await Promise.all([
-        apiFetch(`/api/admin/parts?page=${page}&pageSize=${pageSize}&search=${search}`),
+        apiFetch("/api/admin/parts"),
         apiFetch("/api/vendors"),
       ]);
       const data = await parseJsonSafe(partsRes);
@@ -167,16 +177,15 @@ export default function AdminPartsPage() {
           .map((part) => attachVendorName(part, vendorById, soleVendorName));
 
       if (partsRes.ok) {
-        if (data && typeof data === "object" && "items" in data && Array.isArray((data as any).items)) {
-          setParts(mapParts((data as any).items));
-          setTotalCount(Number((data as any).totalCount ?? 0));
+        if (data && typeof data === "object" && "items" in data && Array.isArray((data as { items: unknown[] }).items)) {
+          setParts(mapParts((data as { items: unknown[] }).items));
         } else if (Array.isArray(data)) {
           setParts(mapParts(data));
-          setTotalCount(data.length);
+        } else {
+          setParts([]);
         }
       } else {
         setParts([]);
-        setTotalCount(0);
         setStatus({
           tone: "error",
           text: extractApiError(data, "Could not load parts. Check that you are signed in as admin."),
@@ -184,12 +193,11 @@ export default function AdminPartsPage() {
       }
     } catch {
       setParts([]);
-      setTotalCount(0);
       setStatus({ tone: "error", text: "Network error while loading parts." });
     } finally {
       setLoading(false);
     }
-  }, [page, pageSize, search]);
+  }, []);
 
   useEffect(() => {
     void loadVendors();
@@ -221,6 +229,7 @@ export default function AdminPartsPage() {
   };
 
   const openAdd = () => {
+    clearImageSelection();
     setEditingId(null);
     setForm({
       ...emptyForm,
@@ -231,6 +240,7 @@ export default function AdminPartsPage() {
   };
 
   const openEdit = (part: Part) => {
+    clearImageSelection();
     setEditingId(part.id);
     setForm({
       name: part.name,
@@ -240,13 +250,31 @@ export default function AdminPartsPage() {
       vendorId: part.vendorId || vendors[0]?.id || "",
       category: part.category || "General",
     });
+    setImagePreview(partImageUrl(part.partNumber, imageVersion));
     setShowModal(true);
   };
 
   const closeModal = () => {
+    clearImageSelection();
     setShowModal(false);
     setEditingId(null);
     setForm(emptyForm);
+  };
+
+  const onImageFileChange = (file: File | null) => {
+    clearImageSelection();
+    if (!file) return;
+    if (!["image/png", "image/jpeg", "image/webp"].includes(file.type)) {
+      setStatus({ tone: "error", text: "Use a PNG, JPEG, or WebP image." });
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      setStatus({ tone: "error", text: "Image must be 5 MB or smaller." });
+      return;
+    }
+    setImageFile(file);
+    setImagePreview(URL.createObjectURL(file));
+    setStatus(null);
   };
 
   const handleSave = async () => {
@@ -308,9 +336,29 @@ export default function AdminPartsPage() {
         return;
       }
 
+      if (imageFile) {
+        const upload = await uploadPartImage(partNumber, imageFile);
+        if (!upload.ok) {
+          setStatus({
+            tone: "error",
+            text: `${editingId ? "Part saved" : "Part added"}, but image upload failed: ${upload.message}`,
+          });
+          setImageVersion((v) => v + 1);
+          await loadParts();
+          return;
+        }
+        setImageVersion((v) => v + 1);
+      }
+
       setStatus({
         tone: "success",
-        text: editingId ? "Part updated successfully." : "Part added to inventory.",
+        text: imageFile
+          ? editingId
+            ? "Part and image updated successfully."
+            : "Part added with image."
+          : editingId
+            ? "Part updated successfully."
+            : "Part added to inventory.",
       });
       closeModal();
       await loadParts();
@@ -348,9 +396,12 @@ export default function AdminPartsPage() {
   };
 
   let filteredParts = parts.filter((p) => {
+    const q = search.trim().toLowerCase();
+    const matchesSearch =
+      !q || p.name.toLowerCase().includes(q) || p.partNumber.toLowerCase().includes(q);
     const matchesCategory = filterCategory === "All" || p.category === filterCategory;
     const matchesLowStock = filterLowStock ? p.quantityInStock <= 5 : true;
-    return matchesCategory && matchesLowStock;
+    return matchesSearch && matchesCategory && matchesLowStock;
   });
 
   if (sortOrder === "highToLow") {
@@ -365,6 +416,18 @@ export default function AdminPartsPage() {
       new Set([...CATEGORY_PRESETS, ...parts.map((p) => p.category).filter(Boolean)]),
     ).sort(),
   ];
+
+  const formCategoryOptions = useMemo(
+    () =>
+      Array.from(
+        new Set([
+          ...CATEGORY_PRESETS,
+          ...parts.map((p) => p.category).filter(Boolean),
+          form.category.trim() || "General",
+        ]),
+      ).sort(),
+    [parts, form.category],
+  );
   const totalValue = parts.reduce((acc, p) => acc + p.unitPrice * p.quantityInStock, 0);
   const lowStockCount = parts.filter((p) => p.quantityInStock <= 5).length;
 
@@ -395,6 +458,55 @@ export default function AdminPartsPage() {
                 onChange={(e) => setForm({ ...form, partNumber: e.target.value })}
               />
               <label className="purchase-invoice-field" style={{ gap: 6 }}>
+                <span style={{ fontWeight: 600, color: "#5a4733" }}>Part image (optional)</span>
+                <input
+                  ref={imageInputRef}
+                  type="file"
+                  accept="image/png,image/jpeg,image/webp"
+                  className="form-input"
+                  onChange={(e) => onImageFileChange(e.target.files?.[0] ?? null)}
+                />
+                <span style={{ fontSize: "0.82rem", color: "#6f5a45" }}>
+                  Saved as the SKU filename. PNG, JPEG, or WebP, max 5 MB.
+                </span>
+                {(imagePreview || form.partNumber.trim()) && (
+                  <div
+                    style={{
+                      marginTop: 8,
+                      width: 88,
+                      height: 88,
+                      borderRadius: 10,
+                      border: "1px solid #dccbb1",
+                      overflow: "hidden",
+                      background: "#f5ead8",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                    }}
+                  >
+                    {imagePreview ? (
+                      <Image
+                        src={imagePreview}
+                        alt="Part preview"
+                        width={88}
+                        height={88}
+                        unoptimized
+                        style={{ objectFit: "cover", width: "100%", height: "100%" }}
+                      />
+                    ) : (
+                      <span style={{ fontSize: 11, color: "#8a7358", padding: 8, textAlign: "center" }}>
+                        Preview after upload
+                      </span>
+                    )}
+                  </div>
+                )}
+                {imageFile && (
+                  <button type="button" className="action-btn" style={{ marginTop: 6 }} onClick={clearImageSelection}>
+                    Remove image
+                  </button>
+                )}
+              </label>
+              <label className="purchase-invoice-field" style={{ gap: 6 }}>
                 <span style={{ fontWeight: 600, color: "#5a4733" }}>Vendor</span>
                 <select
                   className="form-input"
@@ -416,18 +528,17 @@ export default function AdminPartsPage() {
               )}
               <label className="purchase-invoice-field" style={{ gap: 6 }}>
                 <span style={{ fontWeight: 600, color: "#5a4733" }}>Category</span>
-                <input
+                <select
                   className="form-input"
-                  list="part-category-options"
-                  placeholder="e.g. Brakes"
-                  value={form.category}
+                  value={form.category || "General"}
                   onChange={(e) => setForm({ ...form, category: e.target.value })}
-                />
-                <datalist id="part-category-options">
-                  {CATEGORY_PRESETS.map((cat) => (
-                    <option key={cat} value={cat} />
+                >
+                  {formCategoryOptions.map((cat) => (
+                    <option key={cat} value={cat}>
+                      {cat}
+                    </option>
                   ))}
-                </datalist>
+                </select>
               </label>
               <div className="form-grid-two">
                 <input
@@ -559,10 +670,7 @@ export default function AdminPartsPage() {
             className="form-input inventory-search"
             placeholder="Search by part name or SKU…"
             value={search}
-            onChange={(e) => {
-              setSearch(e.target.value);
-              setPage(1);
-            }}
+            onChange={(e) => setSearch(e.target.value)}
           />
         </div>
 
@@ -599,10 +707,12 @@ export default function AdminPartsPage() {
                     <div className="part-info">
                       <div className="part-icon-box">
                         <Image
-                          src={`/assets/${p.partNumber}.png`}
+                          src={partImageUrl(p.partNumber, imageVersion)}
                           alt={p.name}
                           width={40}
                           height={40}
+                          loading="lazy"
+                          unoptimized
                           style={{ objectFit: "cover", width: "100%", height: "100%" }}
                           onError={(e) => {
                             e.currentTarget.style.display = "none";
@@ -650,41 +760,6 @@ export default function AdminPartsPage() {
         </table>
         </div>
 
-        {/* Pagination controls */}
-        {totalCount > pageSize && (
-          <div className="inventory-pagination" style={{
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center",
-            padding: "16px 24px",
-            background: "#fdfbf7",
-            borderTop: "1px solid #eadfcd"
-          }}>
-            <span style={{ fontSize: "14px", color: "#6f5a45", fontWeight: "600" }}>
-              Showing {Math.min(totalCount, (page - 1) * pageSize + 1)} to {Math.min(totalCount, page * pageSize)} of {totalCount} parts
-            </span>
-            <div style={{ display: "flex", gap: "10px" }}>
-              <button
-                type="button"
-                className="form-button secondary"
-                style={{ width: "auto", padding: "8px 16px", margin: 0 }}
-                disabled={page <= 1}
-                onClick={() => setPage(page - 1)}
-              >
-                Previous
-              </button>
-              <button
-                type="button"
-                className="form-button"
-                style={{ width: "auto", padding: "8px 16px", margin: 0 }}
-                disabled={page * pageSize >= totalCount}
-                onClick={() => setPage(page + 1)}
-              >
-                Next
-              </button>
-            </div>
-          </div>
-        )}
       </div>
 
       <div className="summary-cards">
@@ -695,10 +770,6 @@ export default function AdminPartsPage() {
         <div className="summary-card alert">
           <div className="summary-card-label">Low stock alerts</div>
           <div className="summary-card-value">{lowStockCount} items</div>
-        </div>
-        <div className="summary-card">
-          <div className="summary-card-label">Vendors</div>
-          <div className="summary-card-value">{vendors.length} active</div>
         </div>
       </div>
     </main>

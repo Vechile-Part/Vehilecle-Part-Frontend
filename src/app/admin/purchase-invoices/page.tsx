@@ -16,12 +16,24 @@ type LineDraft = {
   unitPrice: number;
 };
 
+type PurchaseItemRecord = {
+  partId: string;
+  partName: string;
+  partNumber: string;
+  quantity: number;
+  unitPrice: number;
+};
+
 type PurchaseInvoiceRecord = {
   id: string;
   vendorId: string;
+  vendorName: string;
+  vendorContactPerson: string;
+  vendorPhone: string;
+  vendorEmail: string;
   issuedAtUtc: string;
   totalAmount: number;
-  items: { partId: string; quantity: number; unitPrice: number }[];
+  items: PurchaseItemRecord[];
 };
 
 const rowId = () => `row-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
@@ -45,18 +57,13 @@ const readNum = (obj: Record<string, unknown>, ...keys: string[]) => {
 export default function AdminPurchaseInvoicesPage() {
   const [vendors, setVendors] = useState<VendorOption[]>([]);
   const [parts, setParts] = useState<PartOption[]>([]);
-  const [invoices, setInvoices] = useState<PurchaseInvoiceRecord[]>([]);
+  const [recentPurchases, setRecentPurchases] = useState<PurchaseInvoiceRecord[]>([]);
   const [vendorId, setVendorId] = useState("");
   const [lines, setLines] = useState<LineDraft[]>([{ rowId: rowId(), partId: "", quantity: 1, unitPrice: 0 }]);
   const [loading, setLoading] = useState(true);
+  const [loadingRecent, setLoadingRecent] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [status, setStatus] = useState<{ tone: "success" | "error"; text: string } | null>(null);
-
-  const vendorNameById = useMemo(() => {
-    const map = new Map<string, string>();
-    vendors.forEach((v) => map.set(v.id, v.name));
-    return map;
-  }, [vendors]);
 
   const partById = useMemo(() => {
     const map = new Map<string, PartOption>();
@@ -64,86 +71,150 @@ export default function AdminPurchaseInvoicesPage() {
     return map;
   }, [parts]);
 
+  const vendorById = useMemo(() => {
+    const map = new Map<string, VendorOption>();
+    vendors.forEach((v) => map.set(v.id, v));
+    return map;
+  }, [vendors]);
+
   const subtotal = useMemo(
     () => lines.reduce((sum, line) => sum + Math.max(0, line.quantity) * Math.max(0, line.unitPrice), 0),
     [lines],
   );
 
+  const normalizePurchaseItem = (raw: Record<string, unknown>): PurchaseItemRecord => {
+    const partId = readStr(raw, "partId", "PartId");
+    const part = partById.get(partId);
+    return {
+      partId,
+      partName: readStr(raw, "partName", "PartName") || part?.name || "Part",
+      partNumber: readStr(raw, "partNumber", "PartNumber") || part?.partNumber || "",
+      quantity: readNum(raw, "quantity", "Quantity"),
+      unitPrice: readNum(raw, "unitPrice", "UnitPrice"),
+    };
+  };
+
+  const normalizePurchase = (raw: Record<string, unknown>): PurchaseInvoiceRecord | null => {
+    const id = readStr(raw, "id", "Id");
+    if (!id) return null;
+
+    const vendorId = readStr(raw, "vendorId", "VendorId");
+    const vendor = vendorById.get(vendorId);
+    const itemsRaw = raw.items ?? raw.Items;
+    const items = Array.isArray(itemsRaw)
+      ? itemsRaw.map((item) => normalizePurchaseItem(item as Record<string, unknown>))
+      : [];
+
+    return {
+      id,
+      vendorId,
+      vendorName: readStr(raw, "vendorName", "VendorName") || vendor?.name || "Vendor",
+      vendorContactPerson: readStr(raw, "vendorContactPerson", "VendorContactPerson"),
+      vendorPhone: readStr(raw, "vendorPhone", "VendorPhone"),
+      vendorEmail: readStr(raw, "vendorEmail", "VendorEmail"),
+      issuedAtUtc: readStr(raw, "issuedAtUtc", "IssuedAtUtc"),
+      totalAmount: readNum(raw, "totalAmount", "TotalAmount"),
+      items,
+    };
+  };
+
+  const parsePurchases = (
+    data: unknown,
+    vendorMap: Map<string, VendorOption>,
+    partMap: Map<string, PartOption>,
+  ): PurchaseInvoiceRecord[] => {
+    if (!Array.isArray(data)) return [];
+
+    const normalizeWithMaps = (raw: Record<string, unknown>): PurchaseInvoiceRecord | null => {
+      const id = readStr(raw, "id", "Id");
+      if (!id) return null;
+
+      const vid = readStr(raw, "vendorId", "VendorId");
+      const vendor = vendorMap.get(vid);
+      const itemsRaw = raw.items ?? raw.Items;
+      const items = Array.isArray(itemsRaw)
+        ? itemsRaw.map((item) => {
+            const row = item as Record<string, unknown>;
+            const partId = readStr(row, "partId", "PartId");
+            const part = partMap.get(partId);
+            return {
+              partId,
+              partName: readStr(row, "partName", "PartName") || part?.name || "Part",
+              partNumber: readStr(row, "partNumber", "PartNumber") || part?.partNumber || "",
+              quantity: readNum(row, "quantity", "Quantity"),
+              unitPrice: readNum(row, "unitPrice", "UnitPrice"),
+            };
+          })
+        : [];
+
+      return {
+        id,
+        vendorId: vid,
+        vendorName: readStr(raw, "vendorName", "VendorName") || vendor?.name || "Vendor",
+        vendorContactPerson: readStr(raw, "vendorContactPerson", "VendorContactPerson"),
+        vendorPhone: readStr(raw, "vendorPhone", "VendorPhone"),
+        vendorEmail: readStr(raw, "vendorEmail", "VendorEmail"),
+        issuedAtUtc: readStr(raw, "issuedAtUtc", "IssuedAtUtc"),
+        totalAmount: readNum(raw, "totalAmount", "TotalAmount"),
+        items,
+      };
+    };
+
+    return data
+      .map((row) => normalizeWithMaps(row as Record<string, unknown>))
+      .filter((row): row is PurchaseInvoiceRecord => row !== null);
+  };
+
   const loadAll = useCallback(async () => {
     setLoading(true);
+    setLoadingRecent(true);
     setStatus(null);
     try {
-      const [vendorRes, partRes, invoiceRes] = await Promise.all([
+      const [vendorRes, partRes, purchaseRes] = await Promise.all([
         apiFetch("/api/vendors"),
         apiFetch("/api/parts"),
         apiFetch("/api/purchase-invoices"),
       ]);
 
-      const vendorData = await parseJsonSafe(vendorRes);
-      const partData = await parseJsonSafe(partRes);
-      const invoiceData = await parseJsonSafe(invoiceRes);
+      const [vendorData, partData, purchaseData] = await Promise.all([
+        parseJsonSafe(vendorRes),
+        parseJsonSafe(partRes),
+        parseJsonSafe(purchaseRes),
+      ]);
 
-      if (vendorRes.ok && Array.isArray(vendorData)) {
-        setVendors(
-          vendorData.map((raw) => {
-            const r = raw as Record<string, unknown>;
-            return { id: readStr(r, "id", "Id"), name: readStr(r, "name", "Name") };
-          }),
-        );
-      } else {
-        setVendors([]);
-      }
+      const vendorList: VendorOption[] =
+        vendorRes.ok && Array.isArray(vendorData)
+          ? vendorData.map((raw) => {
+              const r = raw as Record<string, unknown>;
+              return { id: readStr(r, "id", "Id"), name: readStr(r, "name", "Name") };
+            })
+          : [];
 
-      if (partRes.ok && Array.isArray(partData)) {
-        setParts(
-          partData.map((raw) => {
-            const r = raw as Record<string, unknown>;
-            return {
-              id: readStr(r, "id", "Id"),
-              name: readStr(r, "name", "Name"),
-              partNumber: readStr(r, "partNumber", "PartNumber"),
-              unitPrice: readNum(r, "unitPrice", "UnitPrice"),
-            };
-          }),
-        );
-      } else {
-        setParts([]);
-      }
+      const partList: PartOption[] =
+        partRes.ok && Array.isArray(partData)
+          ? partData.map((raw) => {
+              const r = raw as Record<string, unknown>;
+              return {
+                id: readStr(r, "id", "Id"),
+                name: readStr(r, "name", "Name"),
+                partNumber: readStr(r, "partNumber", "PartNumber"),
+                unitPrice: readNum(r, "unitPrice", "UnitPrice"),
+              };
+            })
+          : [];
 
-      if (invoiceRes.ok && Array.isArray(invoiceData)) {
-        setInvoices(
-          invoiceData.map((raw) => {
-            const r = raw as Record<string, unknown>;
-            const itemsRaw = (r.items ?? r.Items) as unknown;
-            const items = Array.isArray(itemsRaw)
-              ? itemsRaw.map((item) => {
-                  const i = item as Record<string, unknown>;
-                  return {
-                    partId: readStr(i, "partId", "PartId"),
-                    quantity: readNum(i, "quantity", "Quantity"),
-                    unitPrice: readNum(i, "unitPrice", "UnitPrice"),
-                  };
-                })
-              : [];
-            return {
-              id: readStr(r, "id", "Id"),
-              vendorId: readStr(r, "vendorId", "VendorId"),
-              issuedAtUtc: readStr(r, "issuedAtUtc", "IssuedAtUtc"),
-              totalAmount: readNum(r, "totalAmount", "TotalAmount"),
-              items,
-            };
-          }),
-        );
-      } else {
-        setInvoices([]);
-        if (!invoiceRes.ok) {
-          setStatus({ tone: "error", text: extractApiError(invoiceData, "Could not load purchase invoices.") });
-        }
-      }
+      setVendors(vendorList);
+      setParts(partList);
+
+      const vendorMap = new Map(vendorList.map((v) => [v.id, v]));
+      const partMap = new Map(partList.map((p) => [p.id, p]));
+      setRecentPurchases(purchaseRes.ok ? parsePurchases(purchaseData, vendorMap, partMap) : []);
     } catch {
       setStatus({ tone: "error", text: "Network error while loading data." });
+      setRecentPurchases([]);
     } finally {
       setLoading(false);
+      setLoadingRecent(false);
     }
   }, []);
 
@@ -216,6 +287,15 @@ export default function AdminPurchaseInvoicesPage() {
     const d = new Date(value);
     return Number.isNaN(d.getTime()) ? value : d.toLocaleString();
   };
+
+  const sortedPurchases = useMemo(
+    () =>
+      recentPurchases
+        .slice()
+        .sort((a, b) => new Date(b.issuedAtUtc).getTime() - new Date(a.issuedAtUtc).getTime())
+        .slice(0, 25),
+    [recentPurchases],
+  );
 
   return (
     <main className="layout-main admin-page purchase-invoice-page">
@@ -305,41 +385,70 @@ export default function AdminPurchaseInvoicesPage() {
       </section>
 
       <section className="form-card inventory-container" style={{ maxWidth: "none", marginTop: "1.5rem", padding: 0, overflow: "hidden" }}>
-        <h2 style={{ padding: "1rem 1rem 0", margin: 0, fontSize: "1.1rem" }}>Recent purchases</h2>
+        <h2 style={{ padding: "1rem 1rem 0", margin: 0, fontSize: "1.1rem" }}>Recent vendor purchases</h2>
         <div className="inventory-table-scroll">
           <table className="inventory-table">
             <thead style={{ background: "#f9f6f0" }}>
               <tr>
                 <th>Date</th>
                 <th>Vendor</th>
-                <th>Lines</th>
+                <th>Items purchased</th>
                 <th>Total</th>
               </tr>
             </thead>
             <tbody>
-              {loading ? (
+              {loadingRecent ? (
                 <tr>
                   <td colSpan={4} style={{ textAlign: "center", padding: "2rem" }}>
                     Loading…
                   </td>
                 </tr>
-              ) : invoices.length === 0 ? (
+              ) : sortedPurchases.length === 0 ? (
                 <tr>
                   <td colSpan={4} style={{ textAlign: "center", padding: "2rem" }}>
-                    No purchase invoices yet.
+                    No vendor purchases yet. Save a purchase above to see it here.
                   </td>
                 </tr>
               ) : (
-                invoices
-                  .slice()
-                  .sort((a, b) => new Date(b.issuedAtUtc).getTime() - new Date(a.issuedAtUtc).getTime())
-                  .slice(0, 25)
-                  .map((inv) => (
-                    <tr key={inv.id}>
-                      <td data-label="Date">{formatDate(inv.issuedAtUtc)}</td>
-                      <td data-label="Vendor">{vendorNameById.get(inv.vendorId) ?? "—"}</td>
-                      <td data-label="Lines">{inv.items.length}</td>
-                      <td data-label="Total">{formatNpr(inv.totalAmount)}</td>
+                sortedPurchases
+                  .map((purchase) => (
+                    <tr key={purchase.id}>
+                      <td data-label="Date">{formatDate(purchase.issuedAtUtc)}</td>
+                      <td data-label="Vendor">
+                        <div style={{ fontWeight: 600 }}>{purchase.vendorName}</div>
+                        {purchase.vendorContactPerson ? (
+                          <div style={{ fontSize: "12px", color: "#6f5a45" }}>{purchase.vendorContactPerson}</div>
+                        ) : null}
+                        {purchase.vendorPhone ? (
+                          <div style={{ fontSize: "12px", color: "#6f5a45" }}>{purchase.vendorPhone}</div>
+                        ) : null}
+                        {purchase.vendorEmail ? (
+                          <div style={{ fontSize: "12px", color: "#6f5a45" }}>{purchase.vendorEmail}</div>
+                        ) : null}
+                      </td>
+                      <td data-label="Items purchased">
+                        {purchase.items.length === 0 ? (
+                          <span style={{ color: "#6f5a45" }}>—</span>
+                        ) : (
+                          <ul className="purchase-invoice-history-items">
+                            {purchase.items.map((item, index) => {
+                              const lineTotal = item.quantity * item.unitPrice;
+                              const label = item.partNumber
+                                ? `${item.partName} (${item.partNumber})`
+                                : item.partName;
+                              return (
+                                <li key={`${purchase.id}-${item.partId}-${index}`}>
+                                  <span className="purchase-invoice-history-item-name">{label}</span>
+                                  <span className="purchase-invoice-history-item-meta">
+                                    {item.quantity} × {formatNpr(item.unitPrice)} = {formatNpr(lineTotal)}
+                                  </span>
+                                </li>
+                              );
+                            })}
+                          </ul>
+                        )}
+                      </td>
+                      <td data-label="Total">{formatNpr(purchase.totalAmount)}</td>
                     </tr>
                   ))
               )}
