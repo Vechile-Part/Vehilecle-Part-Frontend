@@ -1,8 +1,9 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { useMemo } from "react";
 import {
   MdBarChart,
   MdCalendarToday,
@@ -68,6 +69,13 @@ const MAIN_NAV: NavItem[] = [
     match: ["/admin/purchase-invoices"],
     roles: ["admin"],
     Icon: MdReceiptLong,
+  },
+  {
+    href: "/admin/vendors",
+    label: "Vendors",
+    match: ["/admin/vendors"],
+    roles: ["admin"],
+    Icon: MdPeople,
   },
   { href: "/pos", label: "Sales & POS", match: ["/pos"], roles: ["admin", "staff"], Icon: MdPointOfSale },
   {
@@ -162,14 +170,9 @@ function pathMatches(pathname: string, segments: string[]): boolean {
 
 function Sidebar() {
   const pathname = usePathname() ?? "";
-  const [authed, setAuthed] = useState<boolean | null>(null);
-  const [shellRole, setShellRole] = useState<ShellRole | null>(null);
-
-  useEffect(() => {
-    const token = typeof window !== "undefined" ? localStorage.getItem("authToken") : null;
-    setAuthed(Boolean(token));
-    setShellRole(token ? getShellRoleFromToken(token) : null);
-  }, [pathname]);
+  const token = typeof window !== "undefined" ? localStorage.getItem("authToken") : null;
+  const authed = Boolean(token);
+  const shellRole = token ? getShellRoleFromToken(token) : null;
 
   const visibleNav = useMemo(() => {
     if (!shellRole) return [];
@@ -191,13 +194,12 @@ function Sidebar() {
     return { title: "PartTrack", sub: "Signed in" };
   }, [shellRole]);
 
-  if (authed === null) return null;
   if (!authed) return null;
 
   return (
     <aside className="sidebar customer-portal-sidebar">
       <Link href={roleHomeHref(shellRole)} className="sidebar-product-brand">
-        <img
+        <Image
           src="/assets/log.png"
           alt=""
           width={36}

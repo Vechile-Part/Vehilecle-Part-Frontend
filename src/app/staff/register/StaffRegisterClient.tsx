@@ -43,7 +43,8 @@ export default function StaffRegisterClient() {
                 const errorTxt = await res.text();
                 setMessage("Error: " + (errorTxt || "Registration failed. Check if email/vehicle exists."));
             }
-        } catch (err) {
+        } catch (error) {
+            console.error(error);
             setMessage("Network error. Server unreachable.");
         } finally {
             setLoading(false);

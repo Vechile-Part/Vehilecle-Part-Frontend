@@ -1,9 +1,19 @@
 "use client";
 
+import Image from "next/image";
 import { useEffect, useState } from "react";
 import { API_BASE_URL } from "@/lib/api";
 
 const API = API_BASE_URL;
+
+type Part = {
+    id?: string;
+    name?: string;
+    partNumber?: string;
+    category?: string;
+    quantityInStock?: number | string;
+    unitPrice?: number | string;
+};
 
 const getAuthHeaders = () => {
     const token = localStorage.getItem("authToken");
@@ -14,7 +24,7 @@ const getAuthHeaders = () => {
 };
 
 export default function AdminPartsPage() {
-    const [parts, setParts] = useState<any[]>([]);
+    const [parts, setParts] = useState<Part[]>([]);
     const [search, setSearch] = useState("");
     const [loading, setLoading] = useState(true);
     const [showModal, setShowModal] = useState(false);
@@ -36,7 +46,7 @@ export default function AdminPartsPage() {
             const res = await fetch(`${API}/api/admin/parts`, { headers: getAuthHeaders() });
             if (res.ok) {
                 const data = await res.json();
-                setParts(Array.isArray(data) ? data : []);
+                setParts(Array.isArray(data) ? (data as Part[]) : []);
             }
         } catch (err) {
             console.error("Failed to load parts", err);
@@ -61,7 +71,8 @@ export default function AdminPartsPage() {
                 loadParts();
                 setNewPart({ name: "", partNumber: "", category: "", quantityInStock: "", unitPrice: "" });
             }
-        } catch (err) {
+        } catch (error) {
+            console.error(error);
             alert("Failed to save part");
         }
     };
@@ -75,12 +86,12 @@ export default function AdminPartsPage() {
     });
 
     if (sortOrder === "highToLow") {
-        filteredParts = [...filteredParts].sort((a, b) => b.unitPrice - a.unitPrice);
+        filteredParts = [...filteredParts].sort((a, b) => Number(b.unitPrice ?? 0) - Number(a.unitPrice ?? 0));
     } else if (sortOrder === "lowToHigh") {
-        filteredParts = [...filteredParts].sort((a, b) => a.unitPrice - b.unitPrice);
+        filteredParts = [...filteredParts].sort((a, b) => Number(a.unitPrice ?? 0) - Number(b.unitPrice ?? 0));
     }
 
-    const categories = ["All", ...new Set(parts.map(p => p.category).filter(Boolean))];
+    const categories = ["All", ...Array.from(new Set(parts.map((p) => p.category).filter(Boolean) as string[]))];
     const totalValue = parts.reduce((acc, p) => acc + (Number(p.unitPrice) * Number(p.quantityInStock)), 0);
     const lowStockCount = parts.filter(p => Number(p.quantityInStock) <= 5).length;
 
@@ -194,10 +205,12 @@ export default function AdminPartsPage() {
                             <td>
                                 <div className="part-info">
                                     <div className="part-icon-box">
-                                        <img
+                                        <Image
                                             src={`/assets/${p.partNumber}.png`}
-                                            alt={p.name}
-                                            style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                                            alt={p.name ?? "part image"}
+                                            width={40}
+                                            height={40}
+                                            style={{ objectFit: 'cover', width: '100%', height: '100%' }}
                                             onError={(e) => { e.currentTarget.style.display = 'none'; }}
                                         />
                                     </div>

@@ -68,7 +68,7 @@ function PartRequestPage() {
             <div className="part-request-left">
                 <p className="part-request-label">SPECIAL PROCUREMENT</p>
                 <h1 className="part-request-heading">
-                    Can't find what you're looking for?
+                    Can&apos;t find what you&apos;re looking for?
                 </h1>
                 <p className="part-request-desc">
                     Our global logistics network specializes in sourcing rare,

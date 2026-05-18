@@ -28,17 +28,37 @@ export default function StaffInvoicesPage() {
   const [msg, setMsg] = useState("");
 
   const createInvoice = async () => {
+    if (!invoice.customerId.trim()) {
+      setMsg("Customer ID is required to create a sales invoice.");
+      return;
+    }
+
     const res = await fetch(`${API}/api/staff/sales-invoices`, {
       method: "POST",
-      headers: authHeaders(),
-      body: JSON.stringify({ ...invoice, totalAmount: Number(invoice.totalAmount), paidAmount: Number(invoice.paidAmount) }),
+      headers: authHeaders(true),
+      body: JSON.stringify({
+        ...invoice,
+        totalAmount: Number(invoice.totalAmount),
+        paidAmount: Number(invoice.paidAmount),
+      }),
     });
     const data = await parseJsonSafe(res);
     if (res.ok) {
-      const id = typeof data === "string" ? data : "";
+      const id =
+        typeof data === "string"
+          ? data
+          : data && typeof data === "object" && "id" in data
+          ? String((data as Record<string, unknown>).id)
+          : "";
       setInvoiceId(id);
-      setMsg(id ? `Invoice created: ${id}` : "Invoice created");
-    } else setMsg("Create invoice failed");
+      setMsg(id ? `Invoice created: ${id}` : "Invoice created successfully.");
+    } else {
+      const errorMessage =
+        data && typeof data === "object" && "title" in data
+          ? String((data as Record<string, unknown>).title)
+          : "Create invoice failed";
+      setMsg(errorMessage);
+    }
   };
 
   const sendEmail = async () => {

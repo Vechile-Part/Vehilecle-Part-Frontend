@@ -5,33 +5,58 @@ import { API_BASE_URL } from "@/lib/api";
 
 const API = API_BASE_URL;
 
+type StaffMember = {
+    id: string;
+    fullName?: string;
+    firstName?: string;
+    lastName?: string;
+    email?: string;
+    phone?: string;
+    role?: number | string;
+};
+
+type StaffForm = {
+    fullName: string;
+    email: string;
+    phone: string;
+    password: string;
+};
+
+type RoleForm = {
+    userId: string;
+    newRole: number;
+};
+
 const getAuthHeaders = () => ({
     "Content-Type": "application/json",
     "Authorization": `Bearer ${localStorage.getItem("authToken")}`
 });
 
 export default function AdminStaffPage() {
-    const [staffList, setStaffList] = useState<any[]>([]);
+    const [staffList, setStaffList] = useState<StaffMember[]>([]);
     const [showModal, setShowModal] = useState(false);
     const [editMode, setEditMode] = useState(false);
-    const [currentId, setCurrentId] = useState<any>(null);
+    const [currentId, setCurrentId] = useState<string>("");
 
-    const [formData, setFormData] = useState({ fullName: "", email: "", phone: "", password: "" });
-    const [roleForm, setRoleForm] = useState({ userId: "", newRole: 2 });
+    const [formData, setFormData] = useState<StaffForm>({ fullName: "", email: "", phone: "", password: "" });
+    const [roleForm, setRoleForm] = useState<RoleForm>({ userId: "", newRole: 2 });
 
-    useEffect(() => { loadStaff(); }, []);
-
-    const loadStaff = async () => {
+    async function loadStaff() {
         try {
             const res = await fetch(`${API}/api/admin/staff`, { headers: getAuthHeaders() });
             if (res.ok) {
                 const data = await res.json();
                 setStaffList(Array.isArray(data) ? data : []);
             }
-        } catch (err) {
-            console.error(err);
+        } catch (error) {
+            console.error(error);
         }
-    };
+    }
+
+    useEffect(() => {
+        // eslint-disable-next-line react-hooks/set-state-in-effect
+        void loadStaff();
+    }, []);
 
     const handleSave = async () => {
         const url = editMode ? `${API}/api/admin/staff/details` : `${API}/api/admin/staff/register`;
@@ -59,7 +84,8 @@ export default function AdminStaffPage() {
                 const txt = await res.text();
                 alert("Error: " + (txt || "Action failed."));
             }
-        } catch (err) {
+        } catch (error) {
+            console.error(error);
             alert("Network error");
         }
     };
@@ -77,7 +103,8 @@ export default function AdminStaffPage() {
             } else {
                 alert("Delete failed.");
             }
-        } catch (err) {
+        } catch (error) {
+            console.error(error);
             alert("Network error during delete.");
         }
     };
@@ -94,7 +121,8 @@ export default function AdminStaffPage() {
                 alert("Role updated!");
                 loadStaff();
             }
-        } catch (err) {
+        } catch (error) {
+            console.error(error);
             alert("Error updating role");
         }
     };
@@ -129,7 +157,7 @@ export default function AdminStaffPage() {
 
             <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '40px' }}>
                 <h1 className="form-title" style={{ fontSize: '32px', margin: 0 }}>Staff Management</h1>
-                <button className="form-button" onClick={() => { setEditMode(false); setCurrentId(null); setFormData({fullName: "", email: "", phone: "", password: ""}); setShowModal(true); }} style={{ width: 'auto', padding: '12px 32px' }}>
+                <button className="form-button" onClick={() => { setEditMode(false); setCurrentId(""); setFormData({fullName: "", email: "", phone: "", password: ""}); setShowModal(true); }} style={{ width: 'auto', padding: '12px 32px' }}>
                     + Add New Member
                 </button>
             </header>
@@ -156,8 +184,13 @@ export default function AdminStaffPage() {
                             <td>{s.phone || "---"}</td>
                             <td>
                                 <button onClick={() => {
-                                    setCurrentId(s.id);
-                                    setFormData({fullName: s.fullName || `${s.firstName} ${s.lastName}`, email: s.email, phone: s.phone || "", password: ""});
+                                    setCurrentId(s.id ?? "");
+                                    setFormData({
+                                        fullName: s.fullName || `${s.firstName ?? ""} ${s.lastName ?? ""}`.trim(),
+                                        email: s.email ?? "",
+                                        phone: s.phone || "",
+                                        password: "",
+                                    });
                                     setEditMode(true);
                                     setShowModal(true);
                                 }} style={{ background: 'none', border: 'none', color: '#3d2817', cursor: 'pointer', fontWeight: '700', marginRight: '15px' }}>Edit</button>

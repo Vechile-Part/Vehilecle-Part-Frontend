@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { useState } from "react";
 import { API_BASE_URL } from "@/lib/api";
 
@@ -70,7 +71,7 @@ export default function CustomerRegisterPage() {
 
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "40px", marginBottom: "24px", alignItems: "flex-start" }}>
         <div style={{ background: "#fff", border: "1px solid #dccbb1", borderRadius: "8px", padding: "32px", display: "flex", alignItems: "center", justifyContent: "center" }}>
-          <img src="/assets/parts.png" alt="Vehicle Parts" style={{ maxWidth: "100%", height: "auto", maxHeight: "400px" }} />
+          <Image src="/assets/parts.png" alt="Vehicle Parts" width={560} height={360} style={{ maxWidth: "100%", height: "auto", maxHeight: "400px" }} />
         </div>
 
         <div style={{ background: "#fff", border: "1px solid #dccbb1", borderRadius: "8px", padding: "24px" }}>
