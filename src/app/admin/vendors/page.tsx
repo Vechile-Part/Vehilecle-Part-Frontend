@@ -1,10 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { API_BASE_URL } from "@/lib/api";
-import { authHeaders, parseJsonSafe } from "@/lib/http";
-
-const API = API_BASE_URL;
+import { apiFetch, extractApiError, parseJsonSafe } from "@/lib/http";
 
 type Vendor = {
   id: string;
@@ -58,21 +55,21 @@ export default function AdminVendorsPage() {
   const [editMode, setEditMode] = useState(false);
   const [currentId, setCurrentId] = useState("");
   const [form, setForm] = useState<VendorForm>(emptyForm);
-  const [message, setMessage] = useState("");
+  const [message, setMessage] = useState<{ tone: "success" | "error"; text: string } | null>(null);
 
   const loadVendors = useCallback(async () => {
     setLoading(true);
-    setMessage("");
+    setMessage(null);
     try {
-      const res = await fetch(`${API}/api/vendors`, { headers: authHeaders() });
+      const res = await apiFetch("/api/vendors");
       const data = await parseJsonSafe(res);
       if (res.ok && Array.isArray(data)) {
         setVendors(data.map((item) => normalizeVendor(item as Record<string, unknown>)));
       } else {
-        setMessage("Could not load vendors.");
+        setMessage({ tone: "error", text: "Could not load vendors." });
       }
     } catch {
-      setMessage("Network error while loading vendors.");
+      setMessage({ tone: "error", text: "Network error while loading vendors." });
     } finally {
       setLoading(false);
     }
@@ -118,7 +115,7 @@ export default function AdminVendorsPage() {
 
   const handleSave = async () => {
     if (!form.name.trim() || !form.contactPerson.trim() || !form.email.trim()) {
-      alert("Name, contact person, and email are required.");
+      setMessage({ tone: "error", text: "Name, contact person, and email are required." });
       return;
     }
 
@@ -142,37 +139,44 @@ export default function AdminVendorsPage() {
         };
 
     try {
-      const res = await fetch(
-        editMode ? `${API}/api/vendors/${currentId}` : `${API}/api/vendors`,
-        {
-          method: editMode ? "PUT" : "POST",
-          headers: authHeaders(true),
-          body: JSON.stringify(payload),
-        },
-      );
+      const res = editMode
+        ? await apiFetch(`/api/vendors/${currentId}`, {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload),
+          })
+        : await apiFetch("/api/vendors", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload),
+          });
+      const data = await parseJsonSafe(res);
 
       if (res.ok) {
         setShowModal(false);
+        setMessage({ tone: "success", text: editMode ? "Vendor updated." : "Vendor added." });
         await loadVendors();
       } else {
-        alert("Could not save vendor. Check the details and try again.");
+        setMessage({ tone: "error", text: extractApiError(data, "Could not save vendor.") });
       }
     } catch {
-      alert("Network error while saving vendor.");
+      setMessage({ tone: "error", text: "Network error while saving vendor." });
     }
   };
 
   const handleDelete = async (id: string) => {
     if (!confirm("Delete this vendor? Purchase history may still reference them.")) return;
     try {
-      const res = await fetch(`${API}/api/vendors/${id}`, {
-        method: "DELETE",
-        headers: authHeaders(),
-      });
-      if (res.ok) await loadVendors();
-      else alert("Delete failed.");
+      const res = await apiFetch(`/api/vendors/${id}`, { method: "DELETE" });
+      const data = await parseJsonSafe(res);
+      if (res.ok) {
+        setMessage({ tone: "success", text: "Vendor deleted." });
+        await loadVendors();
+      } else {
+        setMessage({ tone: "error", text: extractApiError(data, "Delete failed.") });
+      }
     } catch {
-      alert("Network error during delete.");
+      setMessage({ tone: "error", text: "Network error during delete." });
     }
   };
 
@@ -201,7 +205,7 @@ export default function AdminVendorsPage() {
 
       <MotionlessSearch search={search} setSearch={setSearch} />
 
-      {message && <p className="form-message">{message}</p>}
+      {message && <p className={`purchase-invoice-status ${message.tone}`}>{message.text}</p>}
 
       <MotionlessTable
         loading={loading}

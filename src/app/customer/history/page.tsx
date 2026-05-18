@@ -1,8 +1,17 @@
 "use client";
 import "../../../styles/pages/HistoryPage.css";
 import { useState, useEffect } from "react";
+import { formatNpr } from "@/lib/currency";
+import { apiFetch, readCustomerIdFromSession } from "@/lib/http";
 
 const ITEMS_PER_PAGE = 6;
+
+type InvoiceLine = {
+    partName: string;
+    quantity: number;
+    unitPrice: number;
+    lineTotal: number;
+};
 
 type Invoice = {
     invoiceId: string;
@@ -11,6 +20,7 @@ type Invoice = {
     discountAmount: number;
     paidAmount: number;
     pendingCredit: number;
+    items: InvoiceLine[];
 };
 
 type Appointment = {
@@ -45,27 +55,50 @@ function HistoryPage() {
 
     useEffect(() => {
         const fetchHistory = async () => {
-            const token = localStorage.getItem("authToken");
-            const customerId = localStorage.getItem("customerId");
+            const customerId = readCustomerIdFromSession();
 
-            if (!token || !customerId) {
+            if (!customerId) {
                 setLoading(false);
                 return;
             }
 
             try {
-                const response = await fetch(
-                    `http://localhost:5020/api/customer-history/${customerId}`,
-                    {
-                        headers: {
-                            "Authorization": `Bearer ${token}`,
-                        },
-                    }
-                );
+                const response = await apiFetch(`/api/customer-history/${customerId}`);
 
                 if (response.ok) {
                     const data = await response.json();
-                    setHistory(data);
+                    const record = data as Record<string, unknown>;
+                    const rawInvoices = Array.isArray(record.invoices) ? record.invoices : [];
+                    const invoices = rawInvoices.map((row) => {
+                        const inv = row as Record<string, unknown>;
+                        const rawItems = Array.isArray(inv.items) ? inv.items : [];
+                        const items = rawItems.map((line) => {
+                            const item = line as Record<string, unknown>;
+                            const quantity = Number(item.quantity ?? item.Quantity ?? 0);
+                            const unitPrice = Number(item.unitPrice ?? item.UnitPrice ?? 0);
+                            const lineTotal = Number(item.lineTotal ?? item.LineTotal ?? quantity * unitPrice);
+                            return {
+                                partName: String(item.partName ?? item.PartName ?? "Part"),
+                                quantity,
+                                unitPrice,
+                                lineTotal,
+                            };
+                        });
+                        return {
+                            invoiceId: String(inv.invoiceId ?? inv.InvoiceId ?? ""),
+                            issuedAtUtc: String(inv.issuedAtUtc ?? inv.IssuedAtUtc ?? ""),
+                            totalAmount: Number(inv.totalAmount ?? inv.TotalAmount ?? 0),
+                            discountAmount: Number(inv.discountAmount ?? inv.DiscountAmount ?? 0),
+                            paidAmount: Number(inv.paidAmount ?? inv.PaidAmount ?? 0),
+                            pendingCredit: Number(inv.pendingCredit ?? inv.PendingCredit ?? 0),
+                            items,
+                        };
+                    });
+                    setHistory({
+                        invoices,
+                        appointments: Array.isArray(record.appointments) ? record.appointments : [],
+                        serviceReviews: Array.isArray(record.serviceReviews) ? record.serviceReviews : [],
+                    } as HistoryData);
                 }
             } catch (error) {
                 console.error(error);
@@ -160,27 +193,44 @@ function HistoryPage() {
                         <>
                             {paginate<Invoice>(history.invoices, invoicePage).map((inv) => (
                                 <div key={inv.invoiceId} className="history-card">
+                                    <div className="history-card-header">
+                                        <div>
+                                            <p className="history-card-date-small">{new Date(inv.issuedAtUtc).toLocaleDateString()}</p>
+                                            <p className="history-card-amount">{formatNpr(inv.totalAmount)}</p>
+                                        </div>
+                                        <span className="history-invoice-ref">#{inv.invoiceId.slice(0, 8).toUpperCase()}</span>
+                                    </div>
+                                    {inv.items.length > 0 && (
+                                        <ul className="history-invoice-items">
+                                            {inv.items.map((item) => (
+                                                <li key={`${inv.invoiceId}-${item.partName}-${item.quantity}`}>
+                                                    {item.partName} × {item.quantity} — {formatNpr(item.lineTotal)}
+                                                </li>
+                                            ))}
+                                        </ul>
+                                    )}
                                     <div className="history-card-row">
                                         <span className="history-card-label">Date</span>
                                         <span>{new Date(inv.issuedAtUtc).toLocaleDateString()}</span>
                                     </div>
                                     <div className="history-card-row">
                                         <span className="history-card-label">Total Amount</span>
-                                        <span>Rs. {inv.totalAmount.toFixed(2)}</span>
+                                        <span>{formatNpr(inv.totalAmount)}</span>
                                     </div>
                                     <div className="history-card-row">
                                         <span className="history-card-label">Discount</span>
-                                        <span>Rs. {inv.discountAmount.toFixed(2)}</span>
+                                        <span>{formatNpr(inv.discountAmount)}</span>
                                     </div>
                                     <div className="history-card-row">
                                         <span className="history-card-label">Paid</span>
-                                        <span>Rs. {inv.paidAmount.toFixed(2)}</span>
+                                        <span>{formatNpr(inv.paidAmount)}</span>
                                     </div>
                                     <div className="history-card-row">
                                         <span className="history-card-label">Pending Credit</span>
-                                        <span>Rs. {inv.pendingCredit.toFixed(2)}</span>
+                                        <span>{formatNpr(inv.pendingCredit)}</span>
                                     </div>
-                                    {inv.totalAmount > 5000 && (
+                                    {inv.discountAmount > 0 &&
+                                        inv.totalAmount + inv.discountAmount > 5000 && (
                                         <div className="loyalty-badge">10% Loyalty Discount Applied</div>
                                     )}
                                 </div>

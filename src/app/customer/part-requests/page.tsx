@@ -1,27 +1,30 @@
 "use client";
 import "../../../styles/pages/PartRequestPage.css";
 import { useState } from "react";
+import { apiFetch, extractApiError, parseJsonSafe, readCustomerIdFromSession } from "@/lib/http";
 
 
 function PartRequestPage() {
 
     const [partName, setPartName] = useState("");
     const [description, setDescription] = useState("");
+    const [status, setStatus] = useState<{ tone: "success" | "error"; text: string } | null>(null);
 
     const handleSubmit = async () => {
 
         if (!partName.trim()) {
-            alert("Please enter a part name.");
+            setStatus({ tone: "error", text: "Please enter a part name." });
             return;
         }
 
-        const token = localStorage.getItem("authToken");
-        const customerId = localStorage.getItem("customerId");
+        const customerId = readCustomerIdFromSession();
 
-        if (!token || !customerId) {
-            alert("You must be logged in.");
+        if (!customerId) {
+            setStatus({ tone: "error", text: "You must be logged in." });
             return;
         }
+
+        setStatus(null);
 
         const body = {
             partName: partName.trim(),
@@ -30,35 +33,24 @@ function PartRequestPage() {
 
         try {
 
-            const response = await fetch(
-                `http://localhost:5020/api/customers/${customerId}/part-requests`,
-                {
-                    method: "POST",
-                    headers: {
-                        "Content-Type": "application/json",
-                        "Authorization": `Bearer ${token}`,
-                    },
-                    body: JSON.stringify(body),
-                }
-            );
+            const response = await apiFetch(`/api/customers/${customerId}/part-requests`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(body),
+            });
 
+            const data = await parseJsonSafe(response);
             if (response.ok) {
-                alert("Part request submitted!");
+                setStatus({ tone: "success", text: "Part request submitted." });
                 setPartName("");
                 setDescription("");
             } else {
-                const text = await response.text();
-                try {
-                    const data = JSON.parse(text);
-                    alert(data.message || "Request failed.");
-                } catch {
-                    alert("Request failed. Please try again.");
-                }
+                setStatus({ tone: "error", text: extractApiError(data, "Request failed. Please try again.") });
             }
 
         } catch (error) {
             console.error(error);
-            alert("Could not connect to server.");
+            setStatus({ tone: "error", text: "Could not connect to server." });
         }
     };
 
@@ -95,6 +87,12 @@ function PartRequestPage() {
 
             <div className="part-request-right">
                 <h2 className="part-form-title">Part Request Form</h2>
+
+                {status && (
+                    <p className={`purchase-invoice-status ${status.tone}`} style={{ marginBottom: "1rem" }}>
+                        {status.text}
+                    </p>
+                )}
 
                 <p className="part-form-section-label">PART INFORMATION</p>
 

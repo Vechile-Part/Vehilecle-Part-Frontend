@@ -2,12 +2,10 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { FiLoader, FiPlusCircle, FiTrash2 } from "react-icons/fi";
-import { API_BASE_URL } from "@/lib/api";
-import { authHeaders, isUuid, parseJsonSafe } from "@/lib/http";
+import { FiLoader, FiPlusCircle, FiSearch, FiShoppingCart, FiTrash2, FiUser } from "react-icons/fi";
+import { formatNpr } from "@/lib/currency";
+import { extractApiError, isUuid, parseJsonSafe, apiFetch } from "@/lib/http";
 import { getShellRoleFromToken } from "@/lib/jwtRole";
-
-const API = API_BASE_URL;
 
 type SalePart = {
   id: string;
@@ -33,6 +31,7 @@ type CustomerOption = {
 
 type CreatedInvoice = {
   id: string;
+  invoiceNumber: string;
   customerId: string;
   totalAmount: number;
   discountAmount: number;
@@ -41,21 +40,22 @@ type CreatedInvoice = {
   items: { partName: string; quantity: number; lineTotal: number }[];
 };
 
-const currency = (amount: number) =>
-  new Intl.NumberFormat("en-NP", { style: "currency", currency: "NPR" }).format(amount);
+const LOYALTY_THRESHOLD = 5000;
+const LOYALTY_RATE = 0.1;
 
 const makeRowId = () => `cart-${Math.random().toString(36).slice(2, 9)}`;
 
 const normalizePart = (record: Record<string, unknown>): SalePart | null => {
   const id = String(record.id ?? record.Id ?? "");
   if (!id) return null;
+  const qty = Number(record.quantityInStock ?? record.QuantityInStock ?? 0);
   return {
     id,
     name: String(record.name ?? record.Name ?? "Part"),
     partNumber: String(record.partNumber ?? record.PartNumber ?? ""),
     unitPrice: Number(record.unitPrice ?? record.UnitPrice ?? 0),
-    quantityInStock: Number(record.quantityInStock ?? record.QuantityInStock ?? 0),
-    isLowStock: Boolean(record.isLowStock ?? record.IsLowStock ?? false),
+    quantityInStock: qty,
+    isLowStock: Boolean(record.isLowStock ?? record.IsLowStock ?? qty < 10),
   };
 };
 
@@ -66,6 +66,12 @@ const normalizeCustomerHit = (record: Record<string, unknown>): CustomerOption |
   const phone = String(record.phone ?? record.Phone ?? "");
   return { id, label: phone ? `${name} · ${phone}` : name };
 };
+
+function stockBadge(part: SalePart) {
+  if (part.quantityInStock <= 0) return { label: "Out of stock", className: "out" };
+  if (part.isLowStock || part.quantityInStock < 10) return { label: "Low stock", className: "low" };
+  return { label: "In stock", className: "ok" };
+}
 
 export default function SalesPosPage() {
   const [parts, setParts] = useState<SalePart[]>([]);
@@ -87,9 +93,8 @@ export default function SalesPosPage() {
     try {
       const token = typeof window !== "undefined" ? localStorage.getItem("authToken") : null;
       const role = token ? getShellRoleFromToken(token) : null;
-      const url =
-        role === "admin" ? `${API}/api/admin/parts` : `${API}/api/staff/parts`;
-      const res = await fetch(url, { headers: authHeaders() });
+      const url = role === "admin" ? "/api/admin/parts" : "/api/staff/parts";
+      const res = await apiFetch(url);
       const data = await parseJsonSafe(res);
       if (res.ok && Array.isArray(data)) {
         setParts(
@@ -113,6 +118,12 @@ export default function SalesPosPage() {
     void loadParts();
   }, [loadParts]);
 
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const q = new URLSearchParams(window.location.search).get("q");
+    if (q) setPartsFilter(q);
+  }, []);
+
   const filteredParts = useMemo(() => {
     const term = partsFilter.trim().toLowerCase();
     if (!term) return parts;
@@ -124,7 +135,14 @@ export default function SalesPosPage() {
   }, [parts, partsFilter]);
 
   const subtotal = cart.reduce((sum, line) => sum + line.unitPrice * line.quantity, 0);
-  const estimatedTotal = Math.max(0, subtotal - discountAmount);
+  const loyaltyDiscount = useMemo(
+    () => (subtotal > LOYALTY_THRESHOLD ? Math.round(subtotal * LOYALTY_RATE * 100) / 100 : 0),
+    [subtotal],
+  );
+  const appliedDiscountPreview = Math.min(subtotal, Math.max(discountAmount, loyaltyDiscount));
+  const estimatedTotal = Math.max(0, subtotal - appliedDiscountPreview);
+  const balanceDue = Math.max(0, estimatedTotal - paidAmount);
+  const changeDue = Math.max(0, paidAmount - estimatedTotal);
 
   const addToCart = (part: SalePart) => {
     if (part.quantityInStock <= 0) {
@@ -158,14 +176,15 @@ export default function SalesPosPage() {
   };
 
   const updateLineQuantity = (rowId: string, quantity: number) => {
-    const part = parts.find((item) => cart.find((line) => line.rowId === rowId)?.partId === item.id);
+    const line = cart.find((item) => item.rowId === rowId);
+    const part = parts.find((item) => item.id === line?.partId);
     const safeQty = Math.max(1, quantity);
     if (part && safeQty > part.quantityInStock) {
       setStatus({ tone: "error", text: `Only ${part.quantityInStock} units available for ${part.name}.` });
       return;
     }
     setCart((current) =>
-      current.map((line) => (line.rowId === rowId ? { ...line, quantity: safeQty } : line)),
+      current.map((row) => (row.rowId === rowId ? { ...row, quantity: safeQty } : row)),
     );
   };
 
@@ -196,9 +215,7 @@ export default function SalesPosPage() {
         }
       }
 
-      const res = await fetch(`${API}/api/staff/customers/search?${params.toString()}`, {
-        headers: authHeaders(),
-      });
+      const res = await apiFetch(`/api/staff/customers/search?${params.toString()}`);
       const data = await parseJsonSafe(res);
       if (!res.ok || !Array.isArray(data)) {
         setCustomerOptions([]);
@@ -222,7 +239,7 @@ export default function SalesPosPage() {
 
   const submitSale = async () => {
     if (!isUuid(customerId)) {
-      setStatus({ tone: "error", text: "Select or enter a valid customer ID before completing the sale." });
+      setStatus({ tone: "error", text: "Select or enter a valid customer before completing the sale." });
       return;
     }
     if (cart.length === 0) {
@@ -235,9 +252,9 @@ export default function SalesPosPage() {
     setCreatedInvoice(null);
 
     try {
-      const res = await fetch(`${API}/api/staff/sales-invoices`, {
+      const res = await apiFetch("/api/staff/sales-invoices", {
         method: "POST",
-        headers: authHeaders(true),
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           customerId,
           paidAmount: Number(paidAmount),
@@ -248,13 +265,10 @@ export default function SalesPosPage() {
 
       const data = await parseJsonSafe(res);
       if (!res.ok) {
-        const message =
-          typeof data === "object" && data && "title" in data
-            ? String((data as { title?: string }).title)
-            : typeof data === "string"
-              ? data
-              : "Sale could not be completed. Check stock and customer details.";
-        setStatus({ tone: "error", text: message });
+        setStatus({
+          tone: "error",
+          text: extractApiError(data, "Sale could not be completed. Check stock and customer details."),
+        });
         return;
       }
 
@@ -270,8 +284,11 @@ export default function SalesPosPage() {
           })
         : [];
 
+      const invoiceId = String(record.id ?? record.Id ?? "");
+      const invoiceNumber = String(record.invoiceNumber ?? record.InvoiceNumber ?? "");
       setCreatedInvoice({
-        id: String(record.id ?? record.Id ?? ""),
+        id: invoiceId,
+        invoiceNumber: invoiceNumber || invoiceId.slice(0, 8).toUpperCase(),
         customerId: String(record.customerId ?? record.CustomerId ?? customerId),
         totalAmount: Number(record.totalAmount ?? record.TotalAmount ?? 0),
         discountAmount: Number(record.discountAmount ?? record.DiscountAmount ?? 0),
@@ -294,271 +311,390 @@ export default function SalesPosPage() {
   const sendInvoiceEmail = async () => {
     if (!createdInvoice?.id) return;
     try {
-      const res = await fetch(`${API}/api/staff/sales-invoices/${createdInvoice.id}/send-email`, {
+      const res = await apiFetch(`/api/staff/sales-invoices/${createdInvoice.id}/send-email`, {
         method: "POST",
-        headers: authHeaders(),
       });
+      const data = await parseJsonSafe(res);
       setStatus(
         res.ok
           ? { tone: "success", text: "Invoice email sent to the customer." }
-          : { tone: "error", text: "Email could not be sent for this invoice." },
+          : {
+              tone: "error",
+              text: extractApiError(data, "Email could not be sent for this invoice."),
+            },
       );
     } catch {
       setStatus({ tone: "error", text: "Email request failed." });
     }
   };
 
+  const cartCount = cart.reduce((n, line) => n + line.quantity, 0);
+
   return (
     <section className="sales-pos-page">
-      <header className="sales-pos-header">
-        <p className="purchase-invoice-kicker">Sales &amp; POS</p>
-        <h1>Sell vehicle parts and create sales invoices.</h1>
-        <p>
-          Add parts to the cart, attach a customer, then complete the sale. Stock is reduced automatically and a
-          sales invoice is stored for reporting and email delivery.
-        </p>
+      <header className="sales-pos-header-band">
+        <div className="sales-pos-header-main">
+          <p className="sales-pos-kicker">Sales &amp; POS</p>
+          <h1>Point of sale</h1>
+          <p className="sales-pos-lead">
+            Add parts, attach a customer, and complete the sale. Purchases over {formatNpr(LOYALTY_THRESHOLD)} qualify
+            for loyalty discount.
+          </p>
+          <div className="sales-pos-steps" aria-label="Checkout steps">
+            <span className="sales-pos-step">
+              <span className="sales-pos-step-num">1</span> Catalogue
+            </span>
+            <span className="sales-pos-step">
+              <span className="sales-pos-step-num">2</span> Customer
+            </span>
+            <span className="sales-pos-step">
+              <span className="sales-pos-step-num">3</span> Pay
+            </span>
+          </div>
+        </div>
+        <div className="sales-pos-total-highlight" aria-live="polite">
+          <span>Total due</span>
+          <strong>{formatNpr(estimatedTotal)}</strong>
+        </div>
       </header>
 
-      {status && <MotionlessStatus status={status} />}
+      <div className="sales-pos-stats">
+        <span className="sales-pos-stat-pill">
+          <FiShoppingCart aria-hidden /> Cart: <strong>{cartCount}</strong> item{cartCount === 1 ? "" : "s"}
+        </span>
+        <span className="sales-pos-stat-pill">
+          Subtotal: <strong>{formatNpr(subtotal)}</strong>
+        </span>
+        <span className="sales-pos-stat-pill">
+          Parts: <strong>{partsLoading ? "…" : parts.length}</strong>
+        </span>
+        {loyaltyDiscount > 0 && (
+          <span className="sales-pos-stat-pill">
+            Loyalty min.: <strong>{formatNpr(loyaltyDiscount)}</strong>
+          </span>
+        )}
+      </div>
+
+      {status && <div className={`sales-pos-status ${status.tone}`}>{status.text}</div>}
 
       <div className="sales-pos-grid">
         <div className="sales-pos-card">
-          <h2>Parts catalogue</h2>
+          <div className="sales-pos-card-head">
+            <p className="sales-pos-section-title">Inventory</p>
+            <h2>Parts catalogue</h2>
+          </div>
+          <div className="sales-pos-card-body">
           <div className="sales-pos-parts-toolbar">
             <input
-              className="form-input"
-              placeholder="Search parts by name or SKU..."
+              className="sales-pos-search-input"
+              placeholder="Search by name or part number…"
               value={partsFilter}
               onChange={(event) => setPartsFilter(event.target.value)}
             />
-            <button type="button" className="form-button secondary" onClick={() => void loadParts()} disabled={partsLoading}>
+            <button
+              type="button"
+              className="sales-pos-btn-secondary-link"
+              style={{ minWidth: 100 }}
+              onClick={() => void loadParts()}
+              disabled={partsLoading}
+            >
               {partsLoading ? <FiLoader size={18} /> : "Refresh"}
             </button>
           </div>
 
           <div className="sales-pos-parts-list">
-            {partsLoading ? (
-              <p className="sales-pos-empty">Loading parts...</p>
-            ) : filteredParts.length === 0 ? (
-              <p className="sales-pos-empty">No parts available to sell.</p>
-            ) : (
-              filteredParts.map((part) => (
-                <article
-                  key={part.id}
-                  className={`sales-pos-part-row ${part.isLowStock || part.quantityInStock <= 5 ? "low-stock" : ""}`}
-                >
-                  <div className="sales-pos-part-meta">
-                    <strong>{part.name}</strong>
-                    <span>
-                      {part.partNumber || "No SKU"} · {currency(part.unitPrice)} · Stock {part.quantityInStock}
-                    </span>
-                  </div>
-                  <button type="button" className="form-button secondary" onClick={() => addToCart(part)} disabled={part.quantityInStock <= 0}>
-                    <FiPlusCircle size={16} /> Add
-                  </button>
-                </article>
-              ))
+            {!partsLoading && filteredParts.length > 0 && (
+              <div className="sales-pos-parts-list-head" aria-hidden>
+                <span>Part</span>
+                <span>Price</span>
+                <span>Qty</span>
+                <span />
+              </div>
             )}
+            {partsLoading ? (
+              <p className="sales-pos-empty">Loading parts…</p>
+            ) : filteredParts.length === 0 ? (
+              <p className="sales-pos-empty">No parts match your search.</p>
+            ) : (
+              filteredParts.map((part) => {
+                const badge = stockBadge(part);
+                const out = part.quantityInStock <= 0;
+                return (
+                  <article
+                    key={part.id}
+                    className={`sales-pos-part-row ${part.isLowStock || part.quantityInStock < 10 ? "low-stock" : ""} ${out ? "out-of-stock" : ""}`}
+                  >
+                    <div className="sales-pos-part-meta">
+                      <strong>{part.name}</strong>
+                      <span className="sales-pos-part-sku">{part.partNumber || "No SKU"}</span>
+                      <span className={`sales-pos-stock-badge ${badge.className}`}>{badge.label}</span>
+                    </div>
+                    <span className="sales-pos-part-price-col">{formatNpr(part.unitPrice)}</span>
+                    <span className="sales-pos-part-qty-col">{part.quantityInStock}</span>
+                    <button
+                      type="button"
+                      className="sales-pos-add-btn"
+                      onClick={() => addToCart(part)}
+                      disabled={out}
+                    >
+                      <FiPlusCircle size={16} aria-hidden /> Add
+                    </button>
+                  </article>
+                );
+              })
+            )}
+          </div>
           </div>
         </div>
 
-        <div className="sales-pos-card">
-          <h2>Checkout</h2>
+        <div className="sales-pos-card sales-pos-card--checkout">
+          <div className="sales-pos-card-head">
+            <p className="sales-pos-section-title">Checkout</p>
+            <h2>Customer &amp; payment</h2>
+          </div>
+          <div className="sales-pos-card-body">
+          <div className="sales-pos-panel">
+            <p className="sales-pos-panel-title">
+              <FiUser size={14} aria-hidden /> Customer
+            </p>
+          <div className="sales-pos-customer-pick">
+            <label className="sales-pos-field">
+              <span>Search by name, phone, vehicle, or ID</span>
+              <div className="sales-pos-search-row">
+                <input
+                  className="sales-pos-field-input"
+                  value={customerQuery}
+                  onChange={(event) => setCustomerQuery(event.target.value)}
+                  placeholder="Name, phone, vehicle, or ID"
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter") {
+                      event.preventDefault();
+                      void searchCustomers();
+                    }
+                  }}
+                />
+                <button
+                  type="button"
+                  className="sales-pos-search-btn"
+                  onClick={() => void searchCustomers()}
+                  disabled={isSearchingCustomer}
+                  aria-label="Search customers"
+                >
+                  {isSearchingCustomer ? <FiLoader size={18} /> : <FiSearch size={18} />}
+                </button>
+              </div>
+            </label>
 
-          <MotionlessCustomerSection
-            customerId={customerId}
-            setCustomerId={setCustomerId}
-            customerQuery={customerQuery}
-            setCustomerQuery={setCustomerQuery}
-            customerOptions={customerOptions}
-            isSearchingCustomer={isSearchingCustomer}
-            onSearch={() => void searchCustomers()}
-          />
+            {customerOptions.length > 0 && (
+              <label className="sales-pos-field">
+                <span>Select from results</span>
+                <select
+                  className="sales-pos-field-input"
+                  value={customerId}
+                  onChange={(event) => setCustomerId(event.target.value)}
+                >
+                  <option value="">Select customer</option>
+                  {customerOptions.map((option) => (
+                    <option key={option.id} value={option.id}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            )}
 
-          <h2>Cart</h2>
-          {cart.length === 0 ? (
-            <p className="sales-pos-empty">No parts in the cart yet.</p>
-          ) : (
-            <div className="sales-pos-cart-lines">
-              {cart.map((line) => (
-                <div key={line.rowId} className="sales-pos-cart-line">
-                  <div>
-                    <strong>{line.name}</strong>
-                      <div style={{ fontSize: "0.85rem", color: "#746350" }}>{currency(line.unitPrice)} each</div>
-                  </div>
-                  <input
-                    className="form-input"
-                    type="number"
-                    min={1}
-                    value={line.quantity}
-                    onChange={(event) => updateLineQuantity(line.rowId, Number(event.target.value))}
-                  />
-                  <strong>{currency(line.unitPrice * line.quantity)}</strong>
-                  <button type="button" className="form-button secondary" onClick={() => removeLine(line.rowId)} aria-label="Remove line">
-                    <FiTrash2 size={16} />
-                  </button>
+          </div>
+          </div>
+
+          <div className="sales-pos-panel">
+            <p className="sales-pos-panel-title">
+              <FiShoppingCart size={14} aria-hidden /> Cart
+            </p>
+          <div className="sales-pos-cart-block">
+            {cart.length === 0 ? (
+              <p className="sales-pos-empty">No parts in the cart yet. Add items from the catalogue.</p>
+            ) : (
+              <>
+                <div className="sales-pos-cart-head" aria-hidden>
+                  <span>Item</span>
+                  <span>Qty</span>
+                  <span>Line total</span>
+                  <span />
                 </div>
-              ))}
-            </div>
+                <div className="sales-pos-cart-lines">
+                  {cart.map((line) => (
+                    <div key={line.rowId} className="sales-pos-cart-line">
+                      <div className="sales-pos-cart-line-name">
+                        <strong>{line.name}</strong>
+                        <span>{formatNpr(line.unitPrice)} each</span>
+                      </div>
+                      <input
+                        className="sales-pos-qty-input"
+                        type="number"
+                        min={1}
+                        value={line.quantity}
+                        onChange={(event) => updateLineQuantity(line.rowId, Number(event.target.value))}
+                        aria-label={`Quantity for ${line.name}`}
+                      />
+                      <div className="sales-pos-cart-line-total">{formatNpr(line.unitPrice * line.quantity)}</div>
+                      <button
+                        type="button"
+                        className="sales-pos-icon-btn"
+                        onClick={() => removeLine(line.rowId)}
+                        aria-label={`Remove ${line.name}`}
+                      >
+                        <FiTrash2 size={16} />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </>
+            )}
+          </div>
+          </div>
+
+          {loyaltyDiscount > 0 && discountAmount < loyaltyDiscount && (
+            <p className="sales-pos-loyalty-hint">
+              Loyalty: subtotal over {formatNpr(LOYALTY_THRESHOLD)} — at least {formatNpr(loyaltyDiscount)} discount applies
+              on complete sale.
+              <button type="button" onClick={() => setDiscountAmount(loyaltyDiscount)}>
+                Apply {formatNpr(loyaltyDiscount)} to discount field
+              </button>
+            </p>
           )}
 
-          <label className="purchase-invoice-field">
-            <span>Discount amount</span>
-            <input
-              className="purchase-invoice-control"
-              type="number"
-              min={0}
-              step="0.01"
-              value={discountAmount}
-              onChange={(event) => setDiscountAmount(Number(event.target.value))}
-            />
-          </label>
+          <div className="sales-pos-panel">
+            <p className="sales-pos-panel-title">Payment</p>
+          <div className="sales-pos-payment-grid">
+            <label className="sales-pos-field">
+              <span>Discount (NPR)</span>
+              <input
+                className="sales-pos-field-input"
+                type="number"
+                min={0}
+                step="0.01"
+                value={discountAmount}
+                onChange={(event) => setDiscountAmount(Number(event.target.value))}
+              />
+            </label>
+            <label className="sales-pos-field">
+              <span>Paid amount (NPR)</span>
+              <input
+                className="sales-pos-field-input"
+                type="number"
+                min={0}
+                step="0.01"
+                value={paidAmount}
+                onChange={(event) => setPaidAmount(Number(event.target.value))}
+              />
+            </label>
+          </div>
 
-          <label className="purchase-invoice-field">
-            <span>Paid amount</span>
-            <input
-              className="purchase-invoice-control"
-              type="number"
-              min={0}
-              step="0.01"
-              value={paidAmount}
-              onChange={(event) => setPaidAmount(Number(event.target.value))}
-            />
-          </label>
+          <button
+            type="button"
+            className="sales-pos-btn-pay-full"
+            onClick={() => setPaidAmount(estimatedTotal)}
+            disabled={cart.length === 0}
+          >
+            Pay full amount ({formatNpr(estimatedTotal)})
+          </button>
+          </div>
 
           <div className="sales-pos-summary">
-            <div>
+            <div className="sales-pos-summary-row">
               <span>Subtotal</span>
-              <strong>{currency(subtotal)}</strong>
+              <strong>{formatNpr(subtotal)}</strong>
             </div>
-            <div>
-              <span>After discount (estimate)</span>
-              <strong>{currency(estimatedTotal)}</strong>
+            {appliedDiscountPreview > 0 && (
+              <div className="sales-pos-summary-row discount">
+                <span>Discount (estimate)</span>
+                <strong>−{formatNpr(appliedDiscountPreview)}</strong>
+              </div>
+            )}
+            <div className="sales-pos-total-due-bar">
+              <span>Total due</span>
+              <strong>{formatNpr(estimatedTotal)}</strong>
             </div>
-            <MotionlessSummaryRow
-              label="Change / credit (estimate)"
-              value={currency(Math.max(0, paidAmount - estimatedTotal))}
-            />
+            {paidAmount > 0 && (
+              <>
+                <div className="sales-pos-summary-row">
+                  <span>Balance due</span>
+                  <strong>{formatNpr(balanceDue)}</strong>
+                </div>
+                {changeDue > 0 && (
+                  <div className="sales-pos-summary-row">
+                    <span>Change</span>
+                    <strong>{formatNpr(changeDue)}</strong>
+                  </div>
+                )}
+              </>
+            )}
           </div>
 
           <div className="sales-pos-actions">
-            <button type="button" className="form-button" onClick={() => void submitSale()} disabled={isSubmitting || cart.length === 0}>
-              {isSubmitting ? "Processing sale..." : "Complete sale"}
+            <button
+              type="button"
+              className="sales-pos-btn-primary"
+              onClick={() => void submitSale()}
+              disabled={isSubmitting || cart.length === 0}
+            >
+              {isSubmitting ? "Processing…" : "Complete sale"}
             </button>
-            <Link href="/staff/customers" className="form-button secondary" style={{ textAlign: "center", textDecoration: "none" }}>
-              Find customer
+            <Link href="/staff/customers" className="sales-pos-btn-secondary-link">
+              Customer directory
             </Link>
           </div>
 
           {createdInvoice && (
-            <MotionlessCreatedInvoice invoice={createdInvoice} onEmail={() => void sendInvoiceEmail()} />
+            <div className="sales-pos-receipt">
+              <h3>Sale complete · {createdInvoice.invoiceNumber}</h3>
+              <div className="sales-pos-summary">
+                <div className="sales-pos-summary-row">
+                  <span>Total</span>
+                  <strong>{formatNpr(createdInvoice.totalAmount)}</strong>
+                </div>
+                <div className="sales-pos-summary-row">
+                  <span>Discount applied</span>
+                  <strong>{formatNpr(createdInvoice.discountAmount)}</strong>
+                </div>
+                <div className="sales-pos-summary-row">
+                  <span>Paid</span>
+                  <strong>{formatNpr(createdInvoice.paidAmount)}</strong>
+                </div>
+                <div className="sales-pos-summary-row">
+                  <span>Pending credit</span>
+                  <strong>{formatNpr(createdInvoice.pendingCredit)}</strong>
+                </div>
+              </div>
+              {createdInvoice.items.length > 0 && (
+                <ul className="sales-pos-receipt-list">
+                  {createdInvoice.items.map((item) => (
+                    <li key={`${item.partName}-${item.quantity}`}>
+                      {item.partName} × {item.quantity} — {formatNpr(item.lineTotal)}
+                    </li>
+                  ))}
+                </ul>
+              )}
+              <div className="sales-pos-receipt-actions">
+                <button
+                  type="button"
+                  className="sales-pos-btn-secondary-link"
+                  onClick={() => void sendInvoiceEmail()}
+                >
+                  Email invoice
+                </button>
+                <Link
+                  href={`/staff/invoices?invoiceId=${createdInvoice.id}`}
+                  className="sales-pos-btn-secondary-link"
+                >
+                  View invoices
+                </Link>
+              </div>
+            </div>
           )}
+          </div>
         </div>
       </div>
     </section>
-  );
-}
-
-function MotionlessStatus({ status }: { status: { tone: "success" | "error"; text: string } }) {
-  return <div className={`sales-pos-status ${status.tone}`}>{status.text}</div>;
-}
-
-function MotionlessCustomerSection(props: {
-  customerId: string;
-  setCustomerId: (value: string) => void;
-  customerQuery: string;
-  setCustomerQuery: (value: string) => void;
-  customerOptions: CustomerOption[];
-  isSearchingCustomer: boolean;
-  onSearch: () => void;
-}) {
-  return (
-    <div className="sales-pos-customer-pick">
-      <label className="purchase-invoice-field">
-        <span>Find customer (name, phone, vehicle, or ID)</span>
-        <div style={{ display: "flex", gap: "8px" }}>
-          <input
-            className="purchase-invoice-control"
-            value={props.customerQuery}
-            onChange={(event) => props.setCustomerQuery(event.target.value)}
-            placeholder="Search customers..."
-          />
-          <button type="button" className="form-button secondary" onClick={props.onSearch} disabled={props.isSearchingCustomer}>
-            {props.isSearchingCustomer ? "..." : "Search"}
-          </button>
-        </div>
-      </label>
-
-      {props.customerOptions.length > 0 && (
-        <select
-          className="purchase-invoice-control"
-          value={props.customerId}
-          onChange={(event) => props.setCustomerId(event.target.value)}
-        >
-          <option value="">Select customer</option>
-          {props.customerOptions.map((option) => (
-            <option key={option.id} value={option.id}>
-              {option.label}
-            </option>
-          ))}
-        </select>
-      )}
-
-      <label className="purchase-invoice-field">
-        <span>Customer ID</span>
-        <input
-          className="purchase-invoice-control"
-          value={props.customerId}
-          onChange={(event) => props.setCustomerId(event.target.value)}
-          placeholder="Customer UUID"
-        />
-      </label>
-    </div>
-  );
-}
-
-function MotionlessSummaryRow({ label, value }: { label: string; value: string }) {
-  return (
-    <div>
-      <span>{label}</span>
-      <strong>{value}</strong>
-    </div>
-  );
-}
-
-function MotionlessCreatedInvoice({
-  invoice,
-  onEmail,
-}: {
-  invoice: CreatedInvoice;
-  onEmail: () => void;
-}) {
-  return (
-    <div className="sales-pos-card" style={{ background: "#f7f1e8" }}>
-      <h2>Invoice {invoice.id.slice(0, 8)}…</h2>
-      <div className="sales-pos-summary">
-        <MotionlessSummaryRow label="Total" value={currency(invoice.totalAmount)} />
-        <MotionlessSummaryRow label="Discount applied" value={currency(invoice.discountAmount)} />
-        <MotionlessSummaryRow label="Paid" value={currency(invoice.paidAmount)} />
-        <MotionlessSummaryRow label="Pending credit" value={currency(invoice.pendingCredit)} />
-      </div>
-      {invoice.items.length > 0 && (
-        <ul style={{ margin: 0, paddingLeft: "18px", color: "#5c4934" }}>
-          {invoice.items.map((item) => (
-            <li key={`${item.partName}-${item.quantity}`}>
-              {item.partName} × {item.quantity} ({currency(item.lineTotal)})
-            </li>
-          ))}
-        </ul>
-      )}
-      <div className="sales-pos-actions">
-        <button type="button" className="form-button secondary" onClick={onEmail}>
-          Email invoice
-        </button>
-        <Link href={`/staff/invoices?invoiceId=${invoice.id}`} className="form-button secondary" style={{ textDecoration: "none", textAlign: "center" }}>
-          Open invoices
-        </Link>
-      </div>
-    </div>
   );
 }

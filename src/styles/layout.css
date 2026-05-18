@@ -17,6 +17,30 @@
 .layout-main {
     flex: 1;
     overflow: auto;
-    padding: 28px;
+    padding: clamp(16px, 3vw, 28px);
     min-height: 0;
+    -webkit-overflow-scrolling: touch;
+}
+
+@media (max-width: 900px) {
+    .sidebar.customer-portal-sidebar {
+        width: 220px;
+    }
+}
+
+@media (max-width: 720px) {
+    .layout-body {
+        flex-direction: column;
+    }
+
+    .sidebar.customer-portal-sidebar {
+        width: 100%;
+        min-height: auto;
+        max-height: none;
+        border-bottom: 1px solid #e7d5bb;
+    }
+
+    .sidebar-nav {
+        max-height: 200px;
+    }
 }

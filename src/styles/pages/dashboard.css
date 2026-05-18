@@ -166,7 +166,7 @@
     background: white;
     border: 1px solid #eadfcd;
     border-radius: 12px;
-    box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+    box-shadow: none;
     z-index: 100;
     min-width: 200px;
     padding: 8px;

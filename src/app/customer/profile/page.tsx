@@ -1,36 +1,21 @@
 "use client";
-import { useEffect, useMemo, useState } from "react";
-import { API_BASE_URL } from "@/lib/api";
 
-const API = API_BASE_URL;
-const parseJsonSafe = async (res: Response) => {
-  const text = await res.text();
-  if (!text) return null;
-  try {
-    return JSON.parse(text);
-  } catch {
-    return null;
-  }
-};
+import { useEffect, useMemo, useState } from "react";
+import {
+  apiFetch,
+  authHeaders,
+  extractApiError,
+  parseJsonSafe,
+  readCustomerIdFromSession,
+} from "@/lib/http";
+
 type VehicleItem = { id: string; vehicleNumber: string; make: string; model: string; year: number };
 
-const readCustomerIdFromSession = () => {
-  const fromStorage = localStorage.getItem("customerId") || localStorage.getItem("userId");
-  if (fromStorage) return fromStorage;
-
-  const token = localStorage.getItem("authToken");
-  if (!token) return "";
-
-  try {
-    const payloadPart = token.split(".")[1];
-    if (!payloadPart) return "";
-    const normalized = payloadPart.replace(/-/g, "+").replace(/_/g, "/");
-    const json = atob(normalized.padEnd(Math.ceil(normalized.length / 4) * 4, "="));
-    const payload = JSON.parse(json) as Record<string, string>;
-    return payload.customerId || payload.sub || payload.nameid || payload.userId || "";
-  } catch {
-    return "";
-  }
+type VehicleHealthInsight = {
+  partName: string;
+  riskLevel: number;
+  recommendation: string;
+  daysRemaining: string;
 };
 
 export default function CustomerProfilePage() {
@@ -41,12 +26,15 @@ export default function CustomerProfilePage() {
   const [passwordForm, setPasswordForm] = useState({ currentPassword: "", newPassword: "" });
   const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(true);
+  const [healthVehicleId, setHealthVehicleId] = useState("");
+  const [healthLoading, setHealthLoading] = useState(false);
+  const [healthInsights, setHealthInsights] = useState<VehicleHealthInsight[]>([]);
 
   const resolvedCustomerId = useMemo(() => customerId || profile.id, [customerId, profile.id]);
 
   const loadProfileAndVehicles = async (id: string) => {
     localStorage.setItem("customerId", id);
-    const profileRes = await fetch(`${API}/api/customers/${id}/profile`);
+    const profileRes = await apiFetch(`/api/customers/${id}/profile`);
     if (profileRes.ok) {
       const data = await parseJsonSafe(profileRes);
       if (data && typeof data === "object" && !Array.isArray(data)) {
@@ -60,7 +48,7 @@ export default function CustomerProfilePage() {
       }
     }
 
-    const vehiclesRes = await fetch(`${API}/api/customers/${id}/vehicles`);
+    const vehiclesRes = await apiFetch(`/api/customers/${id}/vehicles`);
     if (vehiclesRes.ok) {
       const vehiclesData = await parseJsonSafe(vehiclesRes);
       if (Array.isArray(vehiclesData)) {
@@ -83,7 +71,6 @@ export default function CustomerProfilePage() {
   useEffect(() => {
     const id = readCustomerIdFromSession();
     if (!id) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
       setMessage("No logged-in customer found. Please login first.");
       setLoading(false);
       return;
@@ -94,35 +81,46 @@ export default function CustomerProfilePage() {
 
   const updateProfile = async () => {
     if (!resolvedCustomerId) return;
-    const res = await fetch(`${API}/api/customers/${resolvedCustomerId}/profile`, {
+    const res = await apiFetch(`/api/customers/${resolvedCustomerId}/profile`, {
       method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(profile),
+      headers: authHeaders(true),
+      body: JSON.stringify({
+        id: resolvedCustomerId,
+        fullName: profile.fullName,
+        phone: profile.phone,
+        email: profile.email,
+      }),
     });
-    setMessage(res.ok ? "Profile updated" : "Profile update failed");
+    setMessage(res.ok ? "Profile updated" : extractApiError(await parseJsonSafe(res), "Profile update failed"));
   };
 
   const changePassword = async () => {
     if (!resolvedCustomerId) return;
-    const res = await fetch(`${API}/api/customers/${resolvedCustomerId}/password`, {
+    const res = await apiFetch(`/api/customers/${resolvedCustomerId}/password`, {
       method: "PUT",
-      headers: { "Content-Type": "application/json" },
+      headers: authHeaders(true),
       body: JSON.stringify(passwordForm),
     });
     if (res.ok) {
       setPasswordForm({ currentPassword: "", newPassword: "" });
       setMessage("Password changed");
     } else {
-      setMessage("Password change failed");
+      setMessage(extractApiError(await parseJsonSafe(res), "Password change failed"));
     }
   };
 
   const addVehicle = async () => {
     if (!resolvedCustomerId) return;
-    const payload = { ...vehicle, id: vehicle.id || crypto.randomUUID() };
-    const res = await fetch(`${API}/api/customers/${resolvedCustomerId}/vehicles`, {
+    const payload = {
+      id: vehicle.id || crypto.randomUUID(),
+      vehicleNumber: vehicle.vehicleNumber,
+      make: vehicle.make,
+      model: vehicle.model,
+      year: vehicle.year,
+    };
+    const res = await apiFetch(`/api/customers/${resolvedCustomerId}/vehicles`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: authHeaders(true),
       body: JSON.stringify(payload),
     });
     if (res.ok) {
@@ -130,27 +128,59 @@ export default function CustomerProfilePage() {
       setVehicle({ id: "", vehicleNumber: "", make: "", model: "", year: 2020 });
       await loadProfileAndVehicles(resolvedCustomerId);
     } else {
-      setMessage("Vehicle add failed");
+      setMessage(extractApiError(await parseJsonSafe(res), "Vehicle add failed"));
+    }
+  };
+
+  const loadVehicleHealth = async (vehicleId: string) => {
+    setHealthVehicleId(vehicleId);
+    setHealthLoading(true);
+    setHealthInsights([]);
+    try {
+      const res = await apiFetch(`/api/customers/vehicles/${vehicleId}/ai-health`);
+      const data = await parseJsonSafe(res);
+      if (res.ok && Array.isArray(data)) {
+        setHealthInsights(
+          data.map((row) => {
+            const record = row as Record<string, unknown>;
+            return {
+              partName: String(record.partName ?? record.PartName ?? "Part"),
+              riskLevel: Number(record.riskLevel ?? record.RiskLevel ?? 0),
+              recommendation: String(record.recommendation ?? record.Recommendation ?? ""),
+              daysRemaining: String(record.daysRemaining ?? record.DaysRemaining ?? ""),
+            };
+          }),
+        );
+      } else {
+        setMessage(extractApiError(data, "Could not load vehicle health insights."));
+      }
+    } catch {
+      setMessage("Network error while loading vehicle health.");
+    } finally {
+      setHealthLoading(false);
     }
   };
 
   const deleteVehicle = async (vehicleId: string) => {
     if (!resolvedCustomerId) return;
-    const res = await fetch(`${API}/api/customers/${resolvedCustomerId}/vehicles/${vehicleId}`, {
+    const res = await apiFetch(`/api/customers/${resolvedCustomerId}/vehicles/${vehicleId}`, {
       method: "DELETE",
+      headers: authHeaders(),
     });
     if (res.ok) {
       setMessage("Vehicle deleted");
       await loadProfileAndVehicles(resolvedCustomerId);
     } else {
-      setMessage("Vehicle delete failed");
+      setMessage(extractApiError(await parseJsonSafe(res), "Vehicle delete failed"));
     }
   };
 
   if (loading) {
     return (
       <main className="form-page">
-        <section className="form-card"><p className="form-message">Loading profile...</p></section>
+        <section className="form-card">
+          <p className="form-message">Loading profile...</p>
+        </section>
       </main>
     );
   }
@@ -158,7 +188,9 @@ export default function CustomerProfilePage() {
   if (!resolvedCustomerId) {
     return (
       <main className="form-page">
-        <section className="form-card"><p className="form-message">{message || "No customer session found."}</p></section>
+        <section className="form-card">
+          <p className="form-message">{message || "No customer session found."}</p>
+        </section>
       </main>
     );
   }
@@ -169,10 +201,27 @@ export default function CustomerProfilePage() {
         <h1 className="form-title">Customer Profile & Vehicles</h1>
         <p className="form-subtitle">Customer ID: {resolvedCustomerId}</p>
         <div className="form-grid">
-          <input className="form-input" placeholder="Full Name" value={profile.fullName} onChange={(e) => setProfile({ ...profile, fullName: e.target.value })} />
-          <input className="form-input" placeholder="Phone" value={profile.phone} onChange={(e) => setProfile({ ...profile, phone: e.target.value })} />
-          <input className="form-input" placeholder="Email" value={profile.email} onChange={(e) => setProfile({ ...profile, email: e.target.value })} />
-          <button className="form-button" onClick={updateProfile}>Update Profile</button>
+          <input
+            className="form-input"
+            placeholder="Full Name"
+            value={profile.fullName}
+            onChange={(e) => setProfile({ ...profile, fullName: e.target.value })}
+          />
+          <input
+            className="form-input"
+            placeholder="Phone"
+            value={profile.phone}
+            onChange={(e) => setProfile({ ...profile, phone: e.target.value })}
+          />
+          <input
+            className="form-input"
+            placeholder="Email"
+            value={profile.email}
+            onChange={(e) => setProfile({ ...profile, email: e.target.value })}
+          />
+          <button type="button" className="form-button" onClick={() => void updateProfile()}>
+            Update Profile
+          </button>
         </div>
 
         <h2 className="form-section-title">Change Password</h2>
@@ -191,7 +240,9 @@ export default function CustomerProfilePage() {
             value={passwordForm.newPassword}
             onChange={(e) => setPasswordForm({ ...passwordForm, newPassword: e.target.value })}
           />
-          <button className="form-button secondary" onClick={changePassword}>Change Password</button>
+          <button type="button" className="form-button secondary" onClick={() => void changePassword()}>
+            Change Password
+          </button>
         </div>
 
         <h2 className="form-section-title">Existing Vehicles</h2>
@@ -201,20 +252,75 @@ export default function CustomerProfilePage() {
           <div className="form-grid">
             {vehicles.map((v) => (
               <div key={v.id} className="result-pre">
-                <p><strong>{v.vehicleNumber}</strong> - {v.make} {v.model} ({v.year})</p>
-                <button className="form-button secondary" onClick={() => deleteVehicle(v.id)}>Delete Vehicle</button>
+                <p>
+                  <strong>{v.vehicleNumber}</strong> - {v.make} {v.model} ({v.year})
+                </p>
+                <div style={{ display: "flex", gap: "8px", flexWrap: "wrap", marginTop: "8px" }}>
+                  <button type="button" className="form-button secondary" onClick={() => void loadVehicleHealth(v.id)}>
+                    View health insights
+                  </button>
+                  <button type="button" className="form-button secondary" onClick={() => void deleteVehicle(v.id)}>
+                    Delete Vehicle
+                  </button>
+                </div>
               </div>
+            ))}
+          </div>
+        )}
+
+        <h2 className="form-section-title">Vehicle health insights</h2>
+        {healthLoading ? (
+          <p className="form-message">Loading health analysis…</p>
+        ) : healthInsights.length === 0 ? (
+          <p className="form-message">
+            {healthVehicleId
+              ? "No insights returned for this vehicle."
+              : "Select a vehicle above to view maintenance recommendations."}
+          </p>
+        ) : (
+          <div className="form-grid">
+            {healthInsights.map((insight) => (
+              <article key={insight.partName} className="result-pre">
+                <p style={{ margin: "0 0 6px", fontWeight: 700 }}>{insight.partName}</p>
+                <p style={{ margin: "0 0 4px", fontSize: "13px" }}>
+                  Risk: {Math.round(insight.riskLevel * 100)}% · Due in {insight.daysRemaining}
+                </p>
+                <p style={{ margin: 0, fontSize: "14px", color: "#5a4733" }}>{insight.recommendation}</p>
+              </article>
             ))}
           </div>
         )}
 
         <h2 className="form-section-title">Add Vehicle</h2>
         <div className="form-grid">
-          <input className="form-input" placeholder="Vehicle Number" value={vehicle.vehicleNumber} onChange={(e) => setVehicle({ ...vehicle, vehicleNumber: e.target.value })} />
-          <input className="form-input" placeholder="Make" value={vehicle.make} onChange={(e) => setVehicle({ ...vehicle, make: e.target.value })} />
-          <input className="form-input" placeholder="Model" value={vehicle.model} onChange={(e) => setVehicle({ ...vehicle, model: e.target.value })} />
-          <input className="form-input" type="number" placeholder="Year" value={vehicle.year} onChange={(e) => setVehicle({ ...vehicle, year: Number(e.target.value) })} />
-          <button className="form-button" onClick={addVehicle}>Add Vehicle</button>
+          <input
+            className="form-input"
+            placeholder="Vehicle Number"
+            value={vehicle.vehicleNumber}
+            onChange={(e) => setVehicle({ ...vehicle, vehicleNumber: e.target.value })}
+          />
+          <input
+            className="form-input"
+            placeholder="Make"
+            value={vehicle.make}
+            onChange={(e) => setVehicle({ ...vehicle, make: e.target.value })}
+          />
+          <input
+            className="form-input"
+            placeholder="Model"
+            value={vehicle.model}
+            onChange={(e) => setVehicle({ ...vehicle, model: e.target.value })}
+          />
+          <input
+            className="form-input"
+            type="number"
+            placeholder="Year"
+            value={vehicle.year}
+            onChange={(e) => setVehicle({ ...vehicle, year: Number(e.target.value) })}
+          />
+          <button type="button" className="form-button" onClick={() => void addVehicle()}>
+            Add Vehicle
+          </button>
         </div>
         {message && <p className="form-message">{message}</p>}
       </section>

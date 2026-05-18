@@ -1,21 +1,12 @@
 "use client";
 
 import { Suspense, useEffect, useMemo, useRef, useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { FiClock, FiDownload, FiFilter, FiMail, FiMapPin, FiPhone, FiSearch, FiTruck } from "react-icons/fi";
-import { API_BASE_URL } from "@/lib/api";
+import { formatNpr } from "@/lib/currency";
+import { apiFetch } from "@/lib/http";
 
-const API = API_BASE_URL;
 const PAGE_SIZE = 4;
-
-const staffRequestHeaders = (): Record<string, string> => {
-  const h: Record<string, string> = { Accept: "application/json" };
-  if (typeof window !== "undefined") {
-    const t = localStorage.getItem("authToken");
-    if (t) h.Authorization = `Bearer ${t}`;
-  }
-  return h;
-};
 
 type SearchCustomer = {
   id: string;
@@ -86,12 +77,6 @@ const EMPTY_PROFILE: CustomerProfile = {
   email: "No email on file",
   address: "",
 };
-
-const formatCurrency = (amount: number) =>
-  new Intl.NumberFormat("en-US", {
-    style: "currency",
-    currency: "USD",
-  }).format(amount);
 
 const formatDateParts = (value: string) => {
   const date = new Date(value);
@@ -256,9 +241,7 @@ const searchByField = async (field: "fullName" | "phone" | "vehicleNumber", quer
   });
   params.set(field, query);
 
-  const response = await fetch(`${API}/api/staff/customers/search?${params.toString()}`, {
-    headers: staffRequestHeaders(),
-  });
+  const response = await apiFetch(`/api/staff/customers/search?${params.toString()}`);
   const data = await parseJsonSafe(response);
 
   if (!response.ok) {
@@ -285,8 +268,10 @@ const getHistoryStatusClass = (invoice: PurchaseInvoice) => {
 
 function StaffCustomersPageContent() {
   const router = useRouter();
+  const pathname = usePathname();
   const searchParams = useSearchParams();
   const searchInputRef = useRef<HTMLInputElement>(null);
+  const directoryBasePath = pathname?.startsWith("/staff") ? "/staff/customers" : "/customers";
   const queryFromUrl = (searchParams.get("q") ?? "").trim();
 
   const [directory, setDirectory] = useState<SearchCustomer[]>([]);
@@ -386,9 +371,7 @@ function StaffCustomersPageContent() {
       setDetailError(null);
 
       try {
-        const detailsResponse = await fetch(`${API}/api/staff/customers/${selectedCustomerId}`, {
-          headers: staffRequestHeaders(),
-        });
+        const detailsResponse = await apiFetch(`/api/staff/customers/${selectedCustomerId}`);
         const detailsData = await parseJsonSafe(detailsResponse);
 
         if (!detailsResponse.ok) {
@@ -431,7 +414,7 @@ function StaffCustomersPageContent() {
     0,
     history.reduce((sum, invoice) => sum + invoice.discountAmount, 0),
   );
-  const membershipTier = lifetimeValue >= 10000 ? "Platinum Member" : "Priority Buyer";
+  const membershipTier = lifetimeValue >= 10000 ? "Platinum Customer" : "Priority Buyer";
   const emailStatus = "Customer communication record";
   const phoneStatus = "Primary Contact";
   const primaryVehicle = vehicles[0];
@@ -516,7 +499,9 @@ function StaffCustomersPageContent() {
           onSubmit={(event) => {
             event.preventDefault();
             const query = searchInputRef.current?.value.trim() ?? "";
-            router.push(query ? `/customers?q=${encodeURIComponent(query)}` : "/customers");
+            router.push(
+              query ? `${directoryBasePath}?q=${encodeURIComponent(query)}` : directoryBasePath,
+            );
           }}
         >
           <div className="customer-directory-search-input-wrap">
@@ -596,7 +581,7 @@ function StaffCustomersPageContent() {
           <div className="customer-directory-profile-stats">
             <div>
               <span>Lifetime Value</span>
-              <strong>{formatCurrency(lifetimeValue)}</strong>
+              <strong>{formatNpr(lifetimeValue)}</strong>
             </div>
             <div>
               <span>Total Orders</span>
@@ -651,7 +636,7 @@ function StaffCustomersPageContent() {
               </div>
               <div>
                 <span>Referral Credit</span>
-                <strong>{formatCurrency(referralCredit)}</strong>
+                <strong>{formatNpr(referralCredit)}</strong>
               </div>
               <div>
                 <span>Primary Vehicle</span>
@@ -750,7 +735,7 @@ function StaffCustomersPageContent() {
 
                     <div className="customer-directory-history-cell customer-directory-history-amount">
                       <span className="customer-directory-mobile-label">Total Amount</span>
-                      <strong className={invoice.totalAmount < 0 ? "negative" : ""}>{formatCurrency(invoice.totalAmount)}</strong>
+                      <strong className={invoice.totalAmount < 0 ? "negative" : ""}>{formatNpr(invoice.totalAmount)}</strong>
                     </div>
                   </article>
                 );

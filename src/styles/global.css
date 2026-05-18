@@ -19,9 +19,12 @@
 @import "./components/customer-portal.css";
 @import "./pages/customer-directory.css";
 @import "./pages/purchase-invoice.css";
+@import "./pages/sales-pos.css";
+@import "./pages/sales-invoices.css";
 @import "./pages/auth.css";
 @import "./pages/reporting.css";
 @import "./pages/admin-alerts.css";
+@import "./pages/admin-pages.css";
 @import "./pages/home.css";
 @import "./pages/dashboard.css";
 

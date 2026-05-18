@@ -1,221 +1,247 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { API_BASE_URL } from "@/lib/api";
-
-const API = API_BASE_URL;
+import { useCallback, useEffect, useState } from "react";
+import { apiFetch, extractApiError, parseJsonSafe } from "@/lib/http";
 
 type StaffMember = {
-    id: string;
-    fullName?: string;
-    firstName?: string;
-    lastName?: string;
-    email?: string;
-    phone?: string;
-    role?: number | string;
+  id: string;
+  fullName?: string;
+  firstName?: string;
+  lastName?: string;
+  email?: string;
+  phone?: string;
+  role?: number | string;
 };
 
 type StaffForm = {
-    fullName: string;
-    email: string;
-    phone: string;
-    password: string;
+  fullName: string;
+  email: string;
+  phone: string;
+  password: string;
 };
 
-type RoleForm = {
-    userId: string;
-    newRole: number;
-};
-
-const getAuthHeaders = () => ({
-    "Content-Type": "application/json",
-    "Authorization": `Bearer ${localStorage.getItem("authToken")}`
-});
+const displayName = (s: StaffMember) =>
+  s.fullName?.trim() || `${s.firstName ?? ""} ${s.lastName ?? ""}`.trim() || "—";
 
 export default function AdminStaffPage() {
-    const [staffList, setStaffList] = useState<StaffMember[]>([]);
-    const [showModal, setShowModal] = useState(false);
-    const [editMode, setEditMode] = useState(false);
-    const [currentId, setCurrentId] = useState<string>("");
+  const [staffList, setStaffList] = useState<StaffMember[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [showModal, setShowModal] = useState(false);
+  const [editMode, setEditMode] = useState(false);
+  const [currentId, setCurrentId] = useState("");
+  const [formData, setFormData] = useState<StaffForm>({ fullName: "", email: "", phone: "", password: "" });
+  const [status, setStatus] = useState<{ tone: "success" | "error"; text: string } | null>(null);
 
-    const [formData, setFormData] = useState<StaffForm>({ fullName: "", email: "", phone: "", password: "" });
-    const [roleForm, setRoleForm] = useState<RoleForm>({ userId: "", newRole: 2 });
-
-    async function loadStaff() {
-        try {
-            const res = await fetch(`${API}/api/admin/staff`, { headers: getAuthHeaders() });
-            if (res.ok) {
-                const data = await res.json();
-                setStaffList(Array.isArray(data) ? data : []);
-            }
-        } catch (error) {
-            console.error(error);
-        }
+  const loadStaff = useCallback(async () => {
+    setLoading(true);
+    setStatus(null);
+    try {
+      const res = await apiFetch("/api/admin/staff");
+      const data = await parseJsonSafe(res);
+      if (res.ok && Array.isArray(data)) {
+        setStaffList(data as StaffMember[]);
+      } else {
+        setStaffList([]);
+        setStatus({ tone: "error", text: extractApiError(data, "Could not load staff.") });
+      }
+    } catch {
+      setStaffList([]);
+      setStatus({ tone: "error", text: "Network error while loading staff." });
+    } finally {
+      setLoading(false);
     }
+  }, []);
 
-    useEffect(() => {
-        // eslint-disable-next-line react-hooks/set-state-in-effect
-        void loadStaff();
-    }, []);
+  useEffect(() => {
+    void loadStaff();
+  }, [loadStaff]);
 
-    const handleSave = async () => {
-        const url = editMode ? `${API}/api/admin/staff/details` : `${API}/api/admin/staff/register`;
-        const method = editMode ? "PUT" : "POST";
+  const handleSave = async () => {
+    const finalPhone = formData.phone.trim() || "0000000000";
+    const finalPassword = formData.password.trim() || "Password123!";
 
-        const finalPhone = formData.phone.trim() || "0000000000";
-        const finalPassword = formData.password.trim() || "Password123!";
+    const payload = editMode
+      ? { userId: currentId, fullName: formData.fullName, email: formData.email, phone: finalPhone }
+      : { fullName: formData.fullName, email: formData.email, phone: finalPhone, password: finalPassword };
 
-        const payload = editMode
-            ? { UserId: currentId, FullName: formData.fullName, Email: formData.email, Phone: finalPhone }
-            : { FullName: formData.fullName, Email: formData.email, Phone: finalPhone, Password: finalPassword };
+    try {
+      const res = editMode
+        ? await apiFetch("/api/admin/staff/details", {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload),
+          })
+        : await apiFetch("/api/admin/staff/register", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload),
+          });
 
-        try {
-            const res = await fetch(url, {
-                method,
-                headers: getAuthHeaders(),
-                body: JSON.stringify(payload),
-            });
+      const data = await parseJsonSafe(res);
+      if (!res.ok) {
+        setStatus({ tone: "error", text: extractApiError(data, "Save failed.") });
+        return;
+      }
 
-            if (res.ok) {
-                alert(editMode ? "Saved!" : `Registered! (Password: ${finalPassword})`);
-                setShowModal(false);
-                loadStaff();
-            } else {
-                const txt = await res.text();
-                alert("Error: " + (txt || "Action failed."));
-            }
-        } catch (error) {
-            console.error(error);
-            alert("Network error");
-        }
-    };
+      setStatus({
+        tone: "success",
+        text: editMode ? "Staff updated." : `Staff registered. Temporary password: ${finalPassword}`,
+      });
+      setShowModal(false);
+      await loadStaff();
+    } catch {
+      setStatus({ tone: "error", text: "Network error." });
+    }
+  };
 
-    const handleDelete = async (id: string) => {
-        if (!confirm("Are you sure you want to delete this staff member?")) return;
-        try {
-            const res = await fetch(`${API}/api/admin/staff/${id}`, {
-                method: "DELETE",
-                headers: getAuthHeaders()
-            });
-            if (res.ok) {
-                alert("Deleted successfully!");
-                loadStaff();
-            } else {
-                alert("Delete failed.");
-            }
-        } catch (error) {
-            console.error(error);
-            alert("Network error during delete.");
-        }
-    };
+  const handleRemoveFromStaff = async (id: string, name: string) => {
+    if (
+      !confirm(
+        `Remove "${name}" from staff?\n\nThey will stay in the system as a customer (no staff login).`,
+      )
+    ) {
+      return;
+    }
+    try {
+      const res = await apiFetch(`/api/admin/staff/${id}`, { method: "DELETE" });
+      const data = await parseJsonSafe(res);
+      if (!res.ok) {
+        setStatus({ tone: "error", text: extractApiError(data, "Could not remove from staff.") });
+        return;
+      }
+      setStatus({ tone: "success", text: "Staff access removed. User is now a customer." });
+      await loadStaff();
+    } catch {
+      setStatus({ tone: "error", text: "Network error." });
+    }
+  };
 
-    const handleUpdateRole = async () => {
-        if (!roleForm.userId) return alert("Select staff member");
-        try {
-            const res = await fetch(`${API}/api/admin/staff/role`, {
-                method: "PUT",
-                headers: getAuthHeaders(),
-                body: JSON.stringify({ UserId: roleForm.userId, NewRole: Number(roleForm.newRole) }),
-            });
-            if (res.ok) {
-                alert("Role updated!");
-                loadStaff();
-            }
-        } catch (error) {
-            console.error(error);
-            alert("Error updating role");
-        }
-    };
-
-    return (
-        <main className="layout-main" style={{ padding: '40px' }}>
-            {showModal && (
-                <div className="modal-overlay">
-                    <div className="modal-container">
-                        <div className="modal-header">
-                            <h2 style={{ margin: 0 }}>{editMode ? "Edit Staff" : "Add Staff"}</h2>
-                            <button onClick={() => setShowModal(false)} style={{ background: 'none', border: 'none', fontSize: '24px', cursor: 'pointer' }}>×</button>
-                        </div>
-                        <div className="form-grid">
-                            <input className="form-input" placeholder="Full Name" value={formData.fullName} onChange={e => setFormData({...formData, fullName: e.target.value})} />
-                            <input className="form-input" placeholder="Email" value={formData.email} onChange={e => setFormData({...formData, email: e.target.value})} />
-                            <input className="form-input" placeholder="Phone" value={formData.phone} onChange={e => setFormData({...formData, phone: e.target.value})} />
-                            {!editMode && (
-                                <input
-                                    type="password"
-                                    className="form-input"
-                                    placeholder="Password (Default: Password123!)"
-                                    value={formData.password}
-                                    onChange={e => setFormData({...formData, password: e.target.value})}
-                                />
-                            )}
-                            <button className="form-button" onClick={handleSave}>Confirm Changes</button>
-                        </div>
-                    </div>
-                </div>
-            )}
-
-            <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '40px' }}>
-                <h1 className="form-title" style={{ fontSize: '32px', margin: 0 }}>Staff Management</h1>
-                <button className="form-button" onClick={() => { setEditMode(false); setCurrentId(""); setFormData({fullName: "", email: "", phone: "", password: ""}); setShowModal(true); }} style={{ width: 'auto', padding: '12px 32px' }}>
-                    + Add New Member
-                </button>
-            </header>
-
-            <div className="form-card" style={{ maxWidth: 'none', border: '1px solid #eadfcd', borderRadius: '12px', padding: '0', overflow: 'hidden' }}>
-                <table className="inventory-table">
-                    <thead style={{ background: '#f9f6f0' }}>
-                    <tr>
-                        <th style={{ padding: '16px 24px', textAlign: 'left' }}>MEMBER NAME</th>
-                        <th style={{ padding: '16px 24px', textAlign: 'left' }}>ROLE</th>
-                        <th style={{ padding: '16px 24px', textAlign: 'left' }}>EMAIL</th>
-                        <th style={{ padding: '16px 24px', textAlign: 'left' }}>PHONE</th>
-                        <th style={{ padding: '16px 24px', textAlign: 'left' }}>ACTIONS</th>
-                    </tr>
-                    </thead>
-                    <tbody>
-                    {staffList.length === 0 ? (
-                        <tr><td colSpan={5} style={{textAlign:'center', padding:'40px'}}>Loading staff list...</td></tr>
-                    ) : staffList.map((s) => (
-                        <tr key={s.id} style={{ borderBottom: '1px solid #f0e4cf' }}>
-                            <td style={{ padding: '20px 24px', fontWeight: '600' }}>{s.fullName || `${s.firstName} ${s.lastName}`}</td>
-                            <td><span className="role-badge">{Number(s.role) === 1 ? "ADMIN" : "STAFF"}</span></td>
-                            <td>{s.email}</td>
-                            <td>{s.phone || "---"}</td>
-                            <td>
-                                <button onClick={() => {
-                                    setCurrentId(s.id ?? "");
-                                    setFormData({
-                                        fullName: s.fullName || `${s.firstName ?? ""} ${s.lastName ?? ""}`.trim(),
-                                        email: s.email ?? "",
-                                        phone: s.phone || "",
-                                        password: "",
-                                    });
-                                    setEditMode(true);
-                                    setShowModal(true);
-                                }} style={{ background: 'none', border: 'none', color: '#3d2817', cursor: 'pointer', fontWeight: '700', marginRight: '15px' }}>Edit</button>
-                                <button onClick={() => handleDelete(s.id)} style={{ background: 'none', border: 'none', color: '#d9534f', cursor: 'pointer', fontWeight: '700' }}>Delete</button>
-                            </td>
-                        </tr>
-                    ))}
-                    </tbody>
-                </table>
+  return (
+    <main className="layout-main admin-page">
+      {showModal && (
+        <div className="modal-overlay" role="dialog" aria-modal="true">
+          <div className="modal-container">
+            <div className="modal-header">
+              <h2 style={{ margin: 0 }}>{editMode ? "Edit staff" : "Add staff"}</h2>
+              <button type="button" onClick={() => setShowModal(false)} style={{ background: "none", border: "none", fontSize: "24px", cursor: "pointer" }}>
+                ×
+              </button>
             </div>
-
-            <div className="form-card" style={{ marginTop: '40px', maxWidth: 'none', border: '1px solid #eadfcd', padding: '40px', borderRadius: '12px' }}>
-                <h2 style={{ fontSize: '24px', color: '#3d2817', marginBottom: '24px', marginTop: 0 }}>Quick Role Update</h2>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-                    <select className="form-input" value={roleForm.userId} onChange={(e) => setRoleForm({...roleForm, userId: e.target.value})}>
-                        <option value="">Select Staff</option>
-                        {staffList.map(s => <option key={s.id} value={s.id}>{s.fullName || `${s.firstName} ${s.lastName}`}</option>)}
-                    </select>
-                    <select className="form-input" value={roleForm.newRole} onChange={(e) => setRoleForm({...roleForm, newRole: Number(e.target.value)})}>
-                        <option value={2}>Staff</option>
-                        <option value={1}>Admin</option>
-                    </select>
-                    <button className="form-button" onClick={handleUpdateRole}>Update Role</button>
-                </div>
+            <div className="form-grid">
+              <input className="form-input" placeholder="Full name" value={formData.fullName} onChange={(e) => setFormData({ ...formData, fullName: e.target.value })} />
+              <input className="form-input" placeholder="Email" value={formData.email} onChange={(e) => setFormData({ ...formData, email: e.target.value })} />
+              <input className="form-input" placeholder="Phone" value={formData.phone} onChange={(e) => setFormData({ ...formData, phone: e.target.value })} />
+              {!editMode && (
+                <input
+                  type="password"
+                  className="form-input"
+                  placeholder="Password (optional)"
+                  value={formData.password}
+                  onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                />
+              )}
+              <button type="button" className="form-button" onClick={() => void handleSave()}>
+                {editMode ? "Save changes" : "Register staff"}
+              </button>
             </div>
-        </main>
-    );
+          </div>
+        </div>
+      )}
+
+      <header className="admin-page-header">
+        <div className="admin-page-header-text">
+          <h1 className="admin-page-title">Staff management</h1>
+          <p className="admin-page-subtitle">Add staff accounts or remove access (user becomes a customer).</p>
+        </div>
+        <div className="admin-page-actions">
+          <button
+            type="button"
+            className="form-button"
+            onClick={() => {
+              setEditMode(false);
+              setCurrentId("");
+              setFormData({ fullName: "", email: "", phone: "", password: "" });
+              setShowModal(true);
+            }}
+          >
+            + Add staff
+          </button>
+        </div>
+      </header>
+
+      {status && <div className={`purchase-invoice-status ${status.tone}`}>{status.text}</div>}
+
+      <div className="form-card inventory-container" style={{ maxWidth: "none", border: "1px solid #eadfcd", borderRadius: "12px", padding: 0, overflow: "hidden" }}>
+        <div className="inventory-table-scroll">
+          <table className="inventory-table">
+            <thead style={{ background: "#f9f6f0" }}>
+              <tr>
+                <th>Name</th>
+                <th>Role</th>
+                <th>Email</th>
+                <th>Phone</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {loading ? (
+                <tr>
+                  <td colSpan={5} style={{ textAlign: "center", padding: "40px" }}>
+                    Loading…
+                  </td>
+                </tr>
+              ) : staffList.length === 0 ? (
+                <tr>
+                  <td colSpan={5} style={{ textAlign: "center", padding: "40px" }}>
+                    No staff accounts.
+                  </td>
+                </tr>
+              ) : (
+                staffList.map((s) => (
+                  <tr key={s.id}>
+                    <td data-label="Name" style={{ fontWeight: 600 }}>
+                      {displayName(s)}
+                    </td>
+                    <td data-label="Role">
+                      <span className="role-badge">{Number(s.role) === 1 ? "Admin" : "Staff"}</span>
+                    </td>
+                    <td data-label="Email">{s.email}</td>
+                    <td data-label="Phone">{s.phone || "—"}</td>
+                    <td data-label="Actions">
+                      <button
+                        type="button"
+                        className="action-btn"
+                        style={{ color: "#3d2817" }}
+                        onClick={() => {
+                          setCurrentId(s.id ?? "");
+                          setFormData({
+                            fullName: displayName(s) === "—" ? "" : displayName(s),
+                            email: s.email ?? "",
+                            phone: s.phone || "",
+                            password: "",
+                          });
+                          setEditMode(true);
+                          setShowModal(true);
+                        }}
+                      >
+                        Edit
+                      </button>
+                      <button
+                        type="button"
+                        className="action-btn"
+                        style={{ color: "#8f3d2b" }}
+                        onClick={() => void handleRemoveFromStaff(s.id, displayName(s))}
+                      >
+                        Remove from staff
+                      </button>
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </main>
+  );
 }

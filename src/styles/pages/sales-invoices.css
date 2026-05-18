@@ -1,0 +1,337 @@
+/* Staff sales invoices — flat layout */
+
+.sales-invoices-page {
+  width: 100%;
+  max-width: 1200px;
+  display: grid;
+  gap: 20px;
+  color: #2f2418;
+  padding-bottom: 32px;
+}
+
+.sales-invoices-header h1 {
+  margin: 4px 0 0;
+  font-size: clamp(1.5rem, 2.2vw, 2rem);
+  color: #1f140b;
+}
+
+.sales-invoices-header p {
+  margin: 8px 0 0;
+  color: #746350;
+  font-size: 0.94rem;
+  max-width: 560px;
+  line-height: 1.55;
+}
+
+.sales-invoices-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(320px, 420px);
+  gap: 18px;
+  align-items: start;
+}
+
+@media (max-width: 960px) {
+  .sales-invoices-layout {
+    grid-template-columns: 1fr;
+  }
+}
+
+.sales-invoices-list-card,
+.sales-invoices-detail-card {
+  border: 1px solid #eadfcd;
+  border-radius: 18px;
+  background: #fffdf8;
+  overflow: hidden;
+}
+
+.sales-invoices-list-head {
+  padding: 16px 18px;
+  border-bottom: 1px solid #eadfcd;
+  background: #fffaf1;
+}
+
+.sales-invoices-list-head h2 {
+  margin: 0;
+  font-size: 1rem;
+  color: #1f140b;
+}
+
+.sales-invoices-toolbar {
+  padding: 12px 18px;
+  border-bottom: 1px solid #efe4d2;
+}
+
+.sales-invoices-search {
+  width: 100%;
+  min-height: 44px;
+  padding: 0 14px;
+  border: 1px solid #d8c3a1;
+  border-radius: 12px;
+  background: #fffdf8;
+  font: inherit;
+  font-size: 0.92rem;
+}
+
+.sales-invoices-search:focus {
+  outline: 2px solid #c4a574;
+  outline-offset: 1px;
+}
+
+.sales-invoices-list {
+  max-height: min(70vh, 640px);
+  overflow: auto;
+}
+
+.sales-invoices-row {
+  display: grid;
+  gap: 4px;
+  width: 100%;
+  padding: 14px 18px;
+  border: none;
+  border-bottom: 1px solid #efe4d2;
+  background: #fffdf8;
+  text-align: left;
+  cursor: pointer;
+  font: inherit;
+  color: inherit;
+  transition: background 0.12s ease;
+}
+
+.sales-invoices-row:hover {
+  background: #fff8ec;
+}
+
+.sales-invoices-row.active {
+  background: #fff4e0;
+  border-left: 3px solid #6d4922;
+}
+
+.sales-invoices-row-top {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  align-items: baseline;
+}
+
+.sales-invoices-row-top strong {
+  font-size: 0.92rem;
+  color: #1f140b;
+}
+
+.sales-invoices-row-top span {
+  font-size: 0.88rem;
+  font-weight: 700;
+  color: #6d4922;
+}
+
+.sales-invoices-row-meta {
+  font-size: 0.8rem;
+  color: #8a7358;
+}
+
+.sales-invoices-badge {
+  display: inline-block;
+  margin-top: 4px;
+  padding: 2px 8px;
+  border-radius: 6px;
+  font-size: 0.68rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.sales-invoices-badge.paid {
+  background: #edf7ee;
+  color: #225a2a;
+  border: 1px solid #b9d8bc;
+}
+
+.sales-invoices-badge.credit {
+  background: #fff3e8;
+  color: #8a5a00;
+  border: 1px solid #e0c48a;
+}
+
+.sales-invoices-detail-card {
+  position: sticky;
+  top: 12px;
+}
+
+.sales-invoices-detail-empty {
+  padding: 32px 20px;
+  text-align: center;
+  color: #746350;
+  font-size: 0.92rem;
+}
+
+.sales-invoices-detail-head {
+  padding: 18px 20px;
+  border-bottom: 1px solid #eadfcd;
+  background: #fffaf1;
+}
+
+.sales-invoices-detail-head h2 {
+  margin: 0 0 6px;
+  font-size: 1.05rem;
+  color: #1f140b;
+}
+
+.sales-invoices-detail-id {
+  font-size: 0.78rem;
+  color: #8a7358;
+  word-break: break-all;
+}
+
+.sales-invoices-detail-body {
+  padding: 18px 20px 20px;
+  display: grid;
+  gap: 16px;
+}
+
+.sales-invoices-lines {
+  border: 1px solid #efe4d2;
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.sales-invoices-lines-head,
+.sales-invoices-line {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 48px 80px 88px;
+  gap: 8px;
+  padding: 10px 12px;
+  font-size: 0.84rem;
+}
+
+.sales-invoices-lines-head {
+  background: #f5ecdc;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #8a7358;
+}
+
+.sales-invoices-line {
+  border-top: 1px solid #efe4d2;
+  background: #fffdf8;
+}
+
+.sales-invoices-line strong {
+  color: #1f140b;
+}
+
+.sales-invoices-line span:last-child {
+  text-align: right;
+  font-weight: 700;
+}
+
+.sales-invoices-totals {
+  border: 1px solid #eadfcd;
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.sales-invoices-total-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 10px 14px;
+  font-size: 0.9rem;
+  border-bottom: 1px solid #efe4d2;
+  color: #5c4934;
+}
+
+.sales-invoices-total-row:last-child {
+  border-bottom: none;
+}
+
+.sales-invoices-total-row.grand {
+  background: #2a1c0f;
+  color: #fff9ef;
+  font-weight: 700;
+}
+
+.sales-invoices-total-row.grand strong {
+  color: #fff9ef;
+}
+
+.sales-invoices-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.sales-invoices-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 42px;
+  padding: 0 16px;
+  border-radius: 12px;
+  border: 1px solid #6d4922;
+  background: #6d4922;
+  color: #fff9ef;
+  font: inherit;
+  font-size: 0.88rem;
+  font-weight: 600;
+  cursor: pointer;
+  text-decoration: none;
+}
+
+.sales-invoices-btn:hover {
+  background: #4a3318;
+}
+
+.sales-invoices-btn.secondary {
+  background: #fffaf1;
+  color: #3d2e1c;
+  border-color: #e5d4bc;
+}
+
+.sales-invoices-btn.secondary:hover {
+  background: #fff8ec;
+}
+
+.sales-invoices-status {
+  padding: 12px 16px;
+  border-radius: 12px;
+  font-size: 0.9rem;
+  border: 1px solid;
+}
+
+.sales-invoices-status.success {
+  background: #edf7ee;
+  border-color: #b9d8bc;
+  color: #225a2a;
+}
+
+.sales-invoices-status.error {
+  background: #fcf1ed;
+  border-color: #e8c1b8;
+  color: #8f3d2b;
+}
+
+.sales-invoices-empty {
+  padding: 28px 18px;
+  text-align: center;
+  color: #746350;
+}
+
+@media print {
+  .sales-invoices-list-card,
+  .sales-invoices-toolbar,
+  .sales-invoices-actions,
+  .sales-invoices-search {
+    display: none !important;
+  }
+
+  .sales-invoices-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .sales-invoices-detail-card {
+    position: static;
+    border: none;
+  }
+}

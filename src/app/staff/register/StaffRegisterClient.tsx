@@ -1,10 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { API_BASE_URL } from "@/lib/api";
-import { FiUser, FiTruck } from "react-icons/fi"; 
-
-const API = API_BASE_URL;
+import { FiUser, FiTruck } from "react-icons/fi";
+import { apiFetch, extractApiError, parseJsonSafe } from "@/lib/http";
 
 export default function StaffRegisterClient() {
     const [customer, setCustomer] = useState({ fullName: "", email: "", phone: "" });
@@ -26,22 +24,19 @@ export default function StaffRegisterClient() {
                 Year: vehicle.year
             };
 
-            const res = await fetch(`${API}/api/staff/customers`, {
+            const res = await apiFetch("/api/staff/customers", {
                 method: "POST",
-                headers: {
-                    "Content-Type": "application/json",
-                    "Authorization": `Bearer ${localStorage.getItem("authToken")}`
-                },
+                headers: { "Content-Type": "application/json" },
                 body: JSON.stringify(payload),
             });
+            const data = await parseJsonSafe(res);
 
             if (res.ok) {
-                setMessage("Customer and Vehicle Registered Successfully!");
+                setMessage("Customer and vehicle registered successfully.");
                 setCustomer({ fullName: "", email: "", phone: "" });
                 setVehicle({ vehicleNumber: "", make: "", model: "", year: 2024 });
             } else {
-                const errorTxt = await res.text();
-                setMessage("Error: " + (errorTxt || "Registration failed. Check if email/vehicle exists."));
+                setMessage("Error: " + extractApiError(data, "Registration failed. Check if email or vehicle already exists."));
             }
         } catch (error) {
             console.error(error);

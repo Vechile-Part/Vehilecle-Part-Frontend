@@ -143,11 +143,14 @@
     background: #fffaf1;
     border-radius: 16px;
     gap: 14px;
+    align-items: center;
 }
 
 .customer-portal-sidebar .sidebar-badge-icon {
     width: 52px;
     height: 52px;
+    min-width: 52px;
+    min-height: 52px;
     border-radius: 50%;
     border: none;
     background: #6d4922;
@@ -181,30 +184,86 @@
 .customer-portal-sidebar .sidebar-item {
     display: flex;
     align-items: center;
-    gap: 14px;
-    padding: 14px 16px;
+    gap: 12px;
+    margin: 0 6px;
+    padding: 12px 14px;
     border-radius: 14px;
-    font-size: 15px;
+    font-size: 0.94rem;
+    font-weight: 500;
+    line-height: 1.25;
     color: #2e2216;
+    text-decoration: none;
+    transition: background 0.15s ease, color 0.15s ease;
+}
+
+.customer-portal-sidebar .sidebar-item svg {
+    flex-shrink: 0;
+    opacity: 0.92;
+}
+
+.customer-portal-sidebar .sidebar-item:hover:not(.active) {
+    background: #fff4e0;
+    color: #1f140b;
 }
 
 .customer-portal-sidebar .sidebar-item.active {
     background: #f2ddb3;
     font-weight: 700;
+    color: #1f140b;
 }
 
 .customer-portal-sidebar .sidebar-bottom {
-    border-top: none;
-    padding: 14px 10px 26px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
     margin-top: auto;
-    gap: 10px;
+    padding: 14px 12px 22px;
+    border-top: 1px solid #e7d5bb;
+    background: #fff2db;
 }
 
 .customer-portal-sidebar .sidebar-new-sale {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    margin: 0 6px 10px;
+    padding: 13px 16px;
     min-height: 48px;
     border-radius: 14px;
-    font-size: 15px;
+    border: 1px solid #1a1209;
+    font-size: 0.95rem;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    color: #fff9ef;
     background: #2a1c0f;
+    text-decoration: none;
+    box-shadow: none;
+    transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+
+.customer-portal-sidebar .sidebar-new-sale:hover {
+    color: #fffdf8;
+    background: #3d2914;
+    border-color: #2a1c0f;
+}
+
+.customer-portal-sidebar .sidebar-new-sale:active {
+    background: #24180d;
+}
+
+.customer-portal-sidebar .sidebar-new-sale svg {
+    flex-shrink: 0;
+    opacity: 1;
+}
+
+.customer-portal-sidebar .sidebar-logout {
+    color: #8a4038;
+}
+
+.customer-portal-sidebar .sidebar-logout:hover {
+    background: #fdecea;
+    color: #6d2f28;
 }
 
 .footer.customer-portal-footer {

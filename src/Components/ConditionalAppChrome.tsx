@@ -1,13 +1,20 @@
 "use client";
 
 import type { ReactNode } from "react";
+import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
-import Footer from "./Footer";
 import Sidebar from "./Sidebar";
 
 export default function ConditionalAppChrome({ children }: { children: ReactNode }) {
   const pathname = usePathname() ?? "";
-  const authOnly = pathname === "/auth" || pathname.startsWith("/auth/");
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  const authOnly =
+    pathname === "/auth" || pathname.startsWith("/auth/") || pathname === "/logout";
 
   if (authOnly) {
     return <div className="auth-shell">{children}</div>;
@@ -15,10 +22,9 @@ export default function ConditionalAppChrome({ children }: { children: ReactNode
 
   return (
     <div className="layout-body">
-      <Sidebar />
+      {mounted ? <Sidebar /> : null}
       <div className="layout-content">
         <main className="layout-main">{children}</main>
-        <Footer />
       </div>
     </div>
   );

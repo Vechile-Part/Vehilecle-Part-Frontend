@@ -83,6 +83,31 @@
     color: #aaa;
 }
 
+.history-invoice-ref {
+    font-size: 12px;
+    font-weight: 600;
+    color: #8a7358;
+    letter-spacing: 0.04em;
+}
+
+.history-invoice-items {
+    margin: 0 0 14px;
+    padding: 12px 14px;
+    list-style: none;
+    border-radius: 10px;
+    border: 1px solid #efe4d2;
+    background: #fffaf1;
+    font-size: 13px;
+    line-height: 1.5;
+    color: #4b321d;
+}
+
+.history-invoice-items li + li {
+    margin-top: 6px;
+    padding-top: 6px;
+    border-top: 1px solid #efe4d2;
+}
+
 .loyalty-badge {
     background: #f8ead4;
     color: #7a4f1f;

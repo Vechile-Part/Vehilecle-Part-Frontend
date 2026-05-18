@@ -3,116 +3,130 @@
 import Link from "next/link";
 import { Suspense, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { API_BASE_URL } from "@/lib/api";
-
-const API = API_BASE_URL;
+import AuthFormHeader from "@/Components/auth/AuthFormHeader";
+import AuthPageShell from "@/Components/auth/AuthPageShell";
+import { apiFetch, extractApiError, parseJsonSafe } from "@/lib/http";
 
 function SetPasswordForm() {
-  const searchParams = useSearchParams();
-  const tokenFromUrl = searchParams.get("token") ?? "";
-  const [password, setPassword] = useState("");
-  const [confirm, setConfirm] = useState("");
-  const [message, setMessage] = useState("");
+    const searchParams = useSearchParams();
+    const tokenFromUrl = searchParams.get("token") ?? "";
+    const [password, setPassword] = useState("");
+    const [confirm, setConfirm] = useState("");
+    const [loading, setLoading] = useState(false);
+    const [message, setMessage] = useState("");
+    const [success, setSuccess] = useState(false);
 
-  const submit = async () => {
-    setMessage("");
-    if (!tokenFromUrl.trim()) {
-      setMessage("This page needs a valid link from your invitation email.");
-      return;
-    }
-    if (password.length < 8) {
-      setMessage("Password must be at least 8 characters.");
-      return;
-    }
-    if (password !== confirm) {
-      setMessage("Passwords do not match.");
-      return;
-    }
-
-    try {
-      const res = await fetch(`${API}/api/auth/customer/complete-invite-password`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ token: tokenFromUrl.trim(), newPassword: password }),
-      });
-      const text = await res.text();
-      let data: unknown = null;
-      if (text) {
-        try {
-          data = JSON.parse(text);
-        } catch {
-          data = text;
+    const submit = async () => {
+        setMessage("");
+        setSuccess(false);
+        if (!tokenFromUrl.trim()) {
+            setMessage("This page needs a valid link from your invitation email.");
+            return;
         }
-      }
-      if (!res.ok) {
-        const obj = (data ?? {}) as Record<string, unknown>;
-        const err =
-          (typeof data === "string" && data) ||
-          (obj.message as string | undefined) ||
-          (obj.Message as string | undefined) ||
-          (obj.detail as string | undefined) ||
-          "Could not save password.";
-        setMessage(err);
-        return;
-      }
-      setMessage("Password saved. You can sign in.");
-    } catch {
-      setMessage("Request failed. Check your connection and try again.");
-    }
-  };
+        if (password.length < 8) {
+            setMessage("Password must be at least 8 characters.");
+            return;
+        }
+        if (password !== confirm) {
+            setMessage("Passwords do not match.");
+            return;
+        }
 
-  return (
-    <main className="form-page">
-      <section className="form-card narrow">
-        <h1 className="form-title">Set your password</h1>
-        <p className="form-subtitle">
-          An account was started for you—choose a password to finish. If you meant to create everything yourself from scratch, use{" "}
-          <Link href="/auth/register">create an account</Link> instead.
-        </p>
-        <div className="form-grid">
-          <input
-            className="form-input"
-            placeholder="New password (min 8 characters)"
-            type="password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            autoComplete="new-password"
-          />
-          <input
-            className="form-input"
-            placeholder="Confirm password"
-            type="password"
-            value={confirm}
-            onChange={(e) => setConfirm(e.target.value)}
-            autoComplete="new-password"
-          />
-          <button type="button" className="form-button" onClick={submit}>
-            Save password
-          </button>
-        </div>
-        {message && <p className="form-message">{message}</p>}
-        <p className="form-subtitle" style={{ marginTop: "1rem" }}>
-          <Link href="/auth/login">Sign in</Link>
-          {" · "}
-          <Link href="/auth/register">Create an account yourself</Link>
-        </p>
-      </section>
-    </main>
-  );
+        setLoading(true);
+        try {
+            const res = await apiFetch("/api/auth/customer/complete-invite-password", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ token: tokenFromUrl.trim(), newPassword: password }),
+            });
+            const data = await parseJsonSafe(res);
+            if (!res.ok) {
+                setMessage(extractApiError(data, "Could not save password."));
+                return;
+            }
+            setSuccess(true);
+            setMessage("Password saved. You can sign in.");
+        } catch {
+            setMessage("Request failed. Check your connection and try again.");
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    return (
+        <AuthPageShell>
+            <form
+                className="auth-page-form"
+                onSubmit={(e) => {
+                    e.preventDefault();
+                    if (!loading) void submit();
+                }}
+            >
+                <AuthFormHeader title="Set your password">
+                    <p className="auth-page-lead">
+                        An account was started for you at the workshop. Choose a password to finish. To register
+                        yourself instead, use{" "}
+                        <Link href="/auth/register" className="auth-page-foot-link">
+                            create an account
+                        </Link>
+                        .
+                    </p>
+                </AuthFormHeader>
+
+                <div className="auth-page-field">
+                    <label htmlFor="invite-password">New password</label>
+                    <input
+                        id="invite-password"
+                        className="auth-page-input"
+                        type="password"
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                        autoComplete="new-password"
+                        minLength={8}
+                        required
+                    />
+                </div>
+
+                <div className="auth-page-field">
+                    <label htmlFor="invite-confirm">Confirm password</label>
+                    <input
+                        id="invite-confirm"
+                        className="auth-page-input"
+                        type="password"
+                        value={confirm}
+                        onChange={(e) => setConfirm(e.target.value)}
+                        autoComplete="new-password"
+                        minLength={8}
+                        required
+                    />
+                </div>
+
+                <div className="auth-page-actions">
+                    <Link href="/auth/login" className="auth-page-link">
+                        Back to <strong>sign in</strong>
+                    </Link>
+                    <button type="submit" className="auth-page-primary" disabled={loading}>
+                        {loading ? "Saving…" : "Save password"}
+                    </button>
+                </div>
+
+                {message && (
+                    <div
+                        className={`auth-page-alert auth-page-alert-${success ? "success" : "error"}`}
+                        role="status"
+                    >
+                        {message}
+                    </div>
+                )}
+            </form>
+        </AuthPageShell>
+    );
 }
 
 export default function SetPasswordFromInvitePage() {
-  return (
-    <Suspense
-      fallback={
-        <main className="form-page">
-          <section className="form-card narrow">
-            <p className="form-message">Loading…</p>
-          </section>
-        </main>
-      }
-    >
-      <SetPasswordForm />
-    </Suspense>
-  );
+    return (
+        <Suspense fallback={null}>
+            <SetPasswordForm />
+        </Suspense>
+    );
 }

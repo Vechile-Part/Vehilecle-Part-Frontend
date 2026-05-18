@@ -1,253 +1,335 @@
 "use client";
+
 import "../../../styles/pages/AppointmentPage.css";
-import { useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { apiFetch, extractApiError, parseJsonSafe, readCustomerIdFromSession } from "@/lib/http";
+
+const SERVICES = ["Oil Change", "Brake Check", "Tire Rotation", "Full Diagnostics"];
+
+const SLOTS = [
+    "08:00 AM",
+    "09:30 AM",
+    "11:00 AM",
+    "01:00 PM",
+    "02:30 PM",
+    "04:00 PM",
+    "07:00 PM",
+];
+
+const WEEKDAY_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+
+const MONTH_NAMES = [
+    "January",
+    "February",
+    "March",
+    "April",
+    "May",
+    "June",
+    "July",
+    "August",
+    "September",
+    "October",
+    "November",
+    "December",
+];
+
+function parseSlotToDate(year: number, monthIndex: number, day: number, slot: string): Date {
+    const [timePart, meridiem] = slot.split(" ");
+    const [hoursText, minutesText] = timePart.split(":");
+    let hours = Number(hoursText);
+    const minutes = Number(minutesText);
+    if (meridiem === "PM" && hours !== 12) hours += 12;
+    if (meridiem === "AM" && hours === 12) hours = 0;
+    return new Date(year, monthIndex, day, hours, minutes, 0, 0);
+}
+
+function slotMatchesBooked(slotDate: Date, bookedIso: string[]): boolean {
+    const slotMs = slotDate.getTime();
+    return bookedIso.some((iso) => Math.abs(new Date(iso).getTime() - slotMs) < 60_000);
+}
 
 function AppointmentPage() {
+    const now = new Date();
+    const [viewYear, setViewYear] = useState(now.getFullYear());
+    const [viewMonth, setViewMonth] = useState(now.getMonth());
+    const [selectedDay, setSelectedDay] = useState(now.getDate());
+    const [selectedService, setSelectedService] = useState(SERVICES[0]);
+    const [selectedTime, setSelectedTime] = useState(SLOTS[2]);
+    const [bookedSlots, setBookedSlots] = useState<string[]>([]);
+    const [loadingSlots, setLoadingSlots] = useState(false);
+    const [status, setStatus] = useState<{ tone: "success" | "error"; text: string } | null>(null);
 
-    const [selectedService, setSelectedService] =
-        useState("Oil Change");
+    const daysInMonth = useMemo(
+        () => new Date(viewYear, viewMonth + 1, 0).getDate(),
+        [viewYear, viewMonth],
+    );
 
-    const [selectedDate, setSelectedDate] =
-        useState(7);
+    const firstWeekday = useMemo(
+        () => new Date(viewYear, viewMonth, 1).getDay(),
+        [viewYear, viewMonth],
+    );
 
-    const [selectedTime, setSelectedTime] =
-        useState("11:00 AM");
+    const calendarCells = useMemo(() => {
+        const cells: (number | null)[] = [];
+        for (let i = 0; i < firstWeekday; i++) cells.push(null);
+        for (let d = 1; d <= daysInMonth; d++) cells.push(d);
+        return cells;
+    }, [daysInMonth, firstWeekday]);
 
-    const services = [
-        "Oil Change",
-        "Brake Check",
-        "Tire Rotation",
-        "Full Diagnostics",
-    ];
+    const yearOptions = useMemo(() => {
+        const current = new Date().getFullYear();
+        return Array.from({ length: 6 }, (_, i) => current - 1 + i);
+    }, []);
 
-    const days = [
-        1,2,3,4,5,6,7,8,
-        9,10,11,12,13,14,15,16
-    ];
+    const loadBookedSlots = useCallback(async () => {
+        setLoadingSlots(true);
+        try {
+            const response = await apiFetch(
+                `/api/customers/appointments/availability?year=${viewYear}&month=${viewMonth + 1}&day=${selectedDay}`,
+            );
+            const data = await parseJsonSafe(response);
+            if (response.ok && Array.isArray(data)) {
+                setBookedSlots(data.map(String));
+            } else {
+                setBookedSlots([]);
+            }
+        } catch {
+            setBookedSlots([]);
+        } finally {
+            setLoadingSlots(false);
+        }
+    }, [viewYear, viewMonth, selectedDay]);
 
-    const slots = [
-        "08:00 AM",
-        "09:30 AM",
-        "11:00 AM",
-        "01:00 PM",
-        "02:30 PM",
-        "04:00 PM",
-        "07:00 PM",
-    ];
+    useEffect(() => {
+        void loadBookedSlots();
+    }, [loadBookedSlots]);
+
+    useEffect(() => {
+        if (selectedDay > daysInMonth) setSelectedDay(daysInMonth);
+    }, [daysInMonth, selectedDay]);
+
+    const isDayPast = (day: number) => {
+        const candidate = new Date(viewYear, viewMonth, day, 23, 59, 59);
+        const todayStart = new Date();
+        todayStart.setHours(0, 0, 0, 0);
+        return candidate < todayStart;
+    };
+
+    const isSlotBooked = (slot: string) =>
+        slotMatchesBooked(parseSlotToDate(viewYear, viewMonth, selectedDay, slot), bookedSlots);
+
+    const isSlotPast = (slot: string) => {
+        const slotDate = parseSlotToDate(viewYear, viewMonth, selectedDay, slot);
+        return slotDate.getTime() < Date.now();
+    };
+
+    useEffect(() => {
+        if (!isSlotBooked(selectedTime) && !isSlotPast(selectedTime)) return;
+        const firstFree = SLOTS.find((s) => !isSlotBooked(s) && !isSlotPast(s));
+        if (firstFree) setSelectedTime(firstFree);
+    }, [bookedSlots, viewYear, viewMonth, selectedDay, selectedTime]);
+
+    const changeMonth = (delta: number) => {
+        const next = new Date(viewYear, viewMonth + delta, 1);
+        setViewYear(next.getFullYear());
+        setViewMonth(next.getMonth());
+    };
 
     const handleBooking = async () => {
-
-        const token = localStorage.getItem("authToken");
-        const customerId = localStorage.getItem("customerId");
-
-        if (!token || !customerId) {
-            alert("You must be logged in to book an appointment.");
+        const customerId = readCustomerIdFromSession();
+        if (!customerId) {
+            setStatus({ tone: "error", text: "You must be logged in to book an appointment." });
             return;
         }
 
-        const now = new Date();
-        const year = now.getFullYear();
-        const month = now.getMonth(); // 0-indexed
-
-        // Build the date using actual year + current month + selected day
-        const appointmentDate = new Date(year, month, selectedDate);
-
-        // If the selected day has already passed this month, move to next month
-        if (appointmentDate < new Date()) {
-            appointmentDate.setMonth(appointmentDate.getMonth() + 1);
+        if (isSlotBooked(selectedTime) || isSlotPast(selectedTime)) {
+            setStatus({ tone: "error", text: "Please choose an available time slot." });
+            return;
         }
 
-        const [timePart, meridiem] = selectedTime.split(" ");
-        const [hoursText, minutesText] = timePart.split(":");
-        let hours = Number(hoursText);
-        const minutes = Number(minutesText);
-        if (meridiem === "PM" && hours !== 12) hours += 12;
-        if (meridiem === "AM" && hours === 12) hours = 0;
+        setStatus(null);
 
-        appointmentDate.setHours(hours, minutes, 0, 0);
-
+        const appointmentDate = parseSlotToDate(viewYear, viewMonth, selectedDay, selectedTime);
         const bookingData = {
             serviceType: selectedService,
-            appointmentDate: appointmentDate.toISOString(), // sends full ISO string like 2025-06-07T09:30:00.000Z
+            appointmentDate: appointmentDate.toISOString(),
             notes: null,
         };
 
         try {
-            const response = await fetch(
-                `http://localhost:5020/api/customers/${customerId}/appointments`,
-                {
-                    method: "POST",
-                    headers: {
-                        "Content-Type": "application/json",
-                        "Authorization": `Bearer ${token}`,
-                    },
-                    body: JSON.stringify(bookingData),
-                }
-            );
+            const response = await apiFetch(`/api/customers/${customerId}/appointments`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(bookingData),
+            });
 
+            const data = await parseJsonSafe(response);
             if (response.ok) {
-                alert("Booking Confirmed!");
-            } else {
-                const text = await response.text();
-                try {
-                    const data = JSON.parse(text);
-                    alert(data.message || "Booking failed.");
-                } catch {
-                    alert("Booking failed. Please try again.");
-                }
+                setStatus({ tone: "success", text: "Booking confirmed." });
+                await loadBookedSlots();
+                return;
             }
 
+            setStatus({ tone: "error", text: extractApiError(data, "Booking failed. Please try again.") });
         } catch (error) {
             console.error(error);
-            alert("Could not connect to server.");
+            setStatus({ tone: "error", text: "Could not connect to server." });
         }
     };
+
     return (
         <div className="appointment-page">
-
-            <h1 className="title">
-                Schedule Your Service
-            </h1>
-
+            <h1 className="title">Schedule Your Service</h1>
             <p className="subtitle">
-                Manage your vehicle maintenance
-                with our simplified booking portal.
+                Manage your vehicle maintenance with our simplified booking portal.
             </p>
 
             <div className="main-layout">
-
-                {/* LEFT PANEL */}
                 <div className="left-panel">
-
-                    {/* Vehicle Selection */}
                     <div className="card">
                         <h2>Vehicle Selection</h2>
-
                         <select className="vehicle-select">
-                            <option>
-                                2022 Porsche 911 Carrera
-                            </option>
+                            <option>2022 Porsche 911 Carrera</option>
                         </select>
-
                         <div className="vehicle-info">
-                            <p className="vehicle-title">
-                                Current Selection
-                            </p>
-
-                            <p className="vehicle-subtitle">
-                                Last service: 4 months ago
-                            </p>
+                            <p className="vehicle-title">Current Selection</p>
+                            <p className="vehicle-subtitle">Last service: 4 months ago</p>
                         </div>
                     </div>
 
-                    {/* Services */}
                     <div className="card">
-
                         <h2>Service Type</h2>
-
                         <div className="service-list">
-
-                            {services.map((service) => (
-
+                            {SERVICES.map((service) => (
                                 <button
                                     key={service}
+                                    type="button"
                                     className={
-                                        selectedService === service
-                                            ? "service-btn active"
-                                            : "service-btn"
+                                        selectedService === service ? "service-btn active" : "service-btn"
                                     }
-                                    onClick={() =>
-                                        setSelectedService(service)
-                                    }
+                                    onClick={() => setSelectedService(service)}
                                 >
                                     {service}
                                 </button>
-
                             ))}
-
                         </div>
-
                     </div>
-
                 </div>
 
-                {/* RIGHT PANEL */}
                 <div className="right-panel">
-
                     <h2>Select Date & Time</h2>
 
-                    {/* Calendar */}
-                    <div className="calendar-grid">
-
-                        {days.map((day) => (
-
-                            <button
-                                key={day}
-                                className={
-                                    selectedDate === day
-                                        ? "date-btn active-date"
-                                        : "date-btn"
-                                }
-                                onClick={() =>
-                                    setSelectedDate(day)
-                                }
-                            >
-                                {day}
-                            </button>
-
-                        ))}
-
-                    </div>
-
-                    {/* Time Slots */}
-                    <div className="slots-section">
-
-                        <h3>Available Slots</h3>
-
-                        <div className="slots-grid">
-
-                            {slots.map((slot) => (
-
-                                <button
-                                    key={slot}
-                                    className={
-                                        selectedTime === slot
-                                            ? "slot-btn active-slot"
-                                            : "slot-btn"
-                                    }
-                                    onClick={() =>
-                                        setSelectedTime(slot)
-                                    }
-                                >
-                                    {slot}
-                                </button>
-
+                    <div className="calendar-controls">
+                        <button type="button" className="calendar-nav-btn" onClick={() => changeMonth(-1)}>
+                            ‹
+                        </button>
+                        <select
+                            className="calendar-select"
+                            value={viewMonth}
+                            onChange={(e) => setViewMonth(Number(e.target.value))}
+                        >
+                            {MONTH_NAMES.map((name, index) => (
+                                <option key={name} value={index}>
+                                    {name}
+                                </option>
                             ))}
-
-                        </div>
-
+                        </select>
+                        <select
+                            className="calendar-select"
+                            value={viewYear}
+                            onChange={(e) => setViewYear(Number(e.target.value))}
+                        >
+                            {yearOptions.map((y) => (
+                                <option key={y} value={y}>
+                                    {y}
+                                </option>
+                            ))}
+                        </select>
+                        <button type="button" className="calendar-nav-btn" onClick={() => changeMonth(1)}>
+                            ›
+                        </button>
                     </div>
 
-                    {/* Buttons */}
-                    <div className="button-group">
+                    <div className="calendar-weekdays">
+                        {WEEKDAY_LABELS.map((label) => (
+                            <span key={label} className="weekday-label">
+                                {label}
+                            </span>
+                        ))}
+                    </div>
 
-                        <button className="cancel-btn">
+                    <div className="calendar-grid">
+                        {calendarCells.map((day, index) =>
+                            day === null ? (
+                                <span key={`empty-${index}`} className="calendar-empty" />
+                            ) : (
+                                <button
+                                    key={day}
+                                    type="button"
+                                    disabled={isDayPast(day)}
+                                    className={
+                                        selectedDay === day
+                                            ? "date-btn active-date"
+                                            : isDayPast(day)
+                                              ? "date-btn date-btn-past"
+                                              : "date-btn"
+                                    }
+                                    onClick={() => setSelectedDay(day)}
+                                >
+                                    {day}
+                                </button>
+                            ),
+                        )}
+                    </div>
+
+                    <div className="slots-section">
+                        <h3>
+                            Available Slots
+                            {loadingSlots ? " (updating…)" : ""}
+                        </h3>
+                        <div className="slots-grid">
+                            {SLOTS.map((slot) => {
+                                const booked = isSlotBooked(slot);
+                                const past = isSlotPast(slot);
+                                const disabled = booked || past;
+                                return (
+                                    <button
+                                        key={slot}
+                                        type="button"
+                                        disabled={disabled}
+                                        className={
+                                            selectedTime === slot && !disabled
+                                                ? "slot-btn active-slot"
+                                                : disabled
+                                                  ? "slot-btn slot-btn-disabled"
+                                                  : "slot-btn"
+                                        }
+                                        onClick={() => !disabled && setSelectedTime(slot)}
+                                    >
+                                        {slot}
+                                        {booked ? " (booked)" : past ? " (past)" : ""}
+                                    </button>
+                                );
+                            })}
+                        </div>
+                    </div>
+
+                    {status && (
+                        <p className={`purchase-invoice-status ${status.tone}`} style={{ marginBottom: "1rem" }}>
+                            {status.text}
+                        </p>
+                    )}
+
+                    <div className="button-group">
+                        <button type="button" className="cancel-btn">
                             Cancel
                         </button>
-
-                        <button
-                            className="confirm-btn"
-                            onClick={handleBooking}
-                        >
+                        <button type="button" className="confirm-btn" onClick={() => void handleBooking()}>
                             Confirm Booking
                         </button>
-
                     </div>
-
                 </div>
-
             </div>
-
         </div>
     );
 }

@@ -2,8 +2,8 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
-import { useMemo } from "react";
+import { usePathname, useRouter } from "next/navigation";
+import { useEffect, useMemo, useState } from "react";
 import {
   MdBarChart,
   MdCalendarToday,
@@ -18,12 +18,12 @@ import {
   MdRateReview,
   MdReceiptLong,
   MdSearch,
-  MdSettings,
   MdHistory,
   MdAssignment,
 } from "react-icons/md";
 import { FaUserFriends } from "react-icons/fa";
 import { getShellRoleFromToken } from "@/lib/jwtRole";
+import AdminNotificationBell from "./AdminNotificationBell";
 
 type ShellRole = "admin" | "staff" | "customer";
 
@@ -38,7 +38,7 @@ type NavItem = {
 function roleHomeHref(role: ShellRole | null): string {
   switch (role) {
     case "admin":
-      return "/admin/parts";
+      return "/admin/dashboard";
     case "staff":
       return "/staff/customers";
     case "customer":
@@ -50,6 +50,13 @@ function roleHomeHref(role: ShellRole | null): string {
 
 const MAIN_NAV: NavItem[] = [
   {
+    href: "/admin/dashboard",
+    label: "Dashboard",
+    match: ["/admin/dashboard"],
+    roles: ["admin"],
+    Icon: MdBarChart,
+  },
+  {
     href: "/admin/parts",
     label: "Parts & inventory",
     match: ["/admin/parts"],
@@ -60,6 +67,13 @@ const MAIN_NAV: NavItem[] = [
     href: "/admin/staff",
     label: "Staff management",
     match: ["/admin/staff"],
+    roles: ["admin"],
+    Icon: MdPeople,
+  },
+  {
+    href: "/admin/customer-accounts",
+    label: "Customers",
+    match: ["/admin/customer-accounts"],
     roles: ["admin"],
     Icon: MdPeople,
   },
@@ -79,6 +93,13 @@ const MAIN_NAV: NavItem[] = [
   },
   { href: "/pos", label: "Sales & POS", match: ["/pos"], roles: ["admin", "staff"], Icon: MdPointOfSale },
   {
+    href: "/staff/invoices",
+    label: "Sales invoices",
+    match: ["/staff/invoices"],
+    roles: ["admin", "staff"],
+    Icon: MdReceiptLong,
+  },
+  {
     href: "/customers",
     label: "Customer directory",
     match: ["/customers"],
@@ -93,11 +114,11 @@ const MAIN_NAV: NavItem[] = [
     Icon: FaUserFriends,
   },
   {
-    href: "/staff/invoices",
-    label: "Invoices",
-    match: ["/staff/invoices"],
+    href: "/staff/reports",
+    label: "Customer reports",
+    match: ["/staff/reports"],
     roles: ["staff"],
-    Icon: MdReceiptLong,
+    Icon: MdBarChart,
   },
   {
     href: "/staff/register",
@@ -121,11 +142,11 @@ const MAIN_NAV: NavItem[] = [
     Icon: MdNotifications,
   },
   {
-    href: "/settings",
-    label: "System settings",
-    match: ["/settings"],
-    roles: ["admin", "staff"],
-    Icon: MdSettings,
+    href: "/admin/part-requests",
+    label: "Part requests",
+    match: ["/admin/part-requests"],
+    roles: ["admin"],
+    Icon: MdAssignment,
   },
   {
     href: "/customer/profile",
@@ -170,7 +191,14 @@ function pathMatches(pathname: string, segments: string[]): boolean {
 
 function Sidebar() {
   const pathname = usePathname() ?? "";
-  const token = typeof window !== "undefined" ? localStorage.getItem("authToken") : null;
+  const router = useRouter();
+  const [quickSearch, setQuickSearch] = useState("");
+  const [token, setToken] = useState<string | null>(null);
+
+  useEffect(() => {
+    setToken(localStorage.getItem("authToken"));
+  }, [pathname]);
+
   const authed = Boolean(token);
   const shellRole = token ? getShellRoleFromToken(token) : null;
 
@@ -189,12 +217,25 @@ function Sidebar() {
       return { title: "Staff workspace", sub: "Signed in as staff" };
     }
     if (shellRole === "admin") {
-      return { title: "Main warehouse", sub: "Terminal ID: 082" };
+      return { title: "Admin workspace", sub: "Inventory & billing" };
     }
     return { title: "PartTrack", sub: "Signed in" };
   }, [shellRole]);
 
   if (!authed) return null;
+
+  const submitQuickSearch = () => {
+    const query = quickSearch.trim();
+    if (!query) return;
+    const params = new URLSearchParams({ q: query });
+    if (shellRole === "admin") {
+      router.push(`/admin/parts?${params.toString()}`);
+      return;
+    }
+    if (shellRole === "staff") {
+      router.push(`/pos?${params.toString()}`);
+    }
+  };
 
   return (
     <aside className="sidebar customer-portal-sidebar">
@@ -236,7 +277,13 @@ function Sidebar() {
           <label className="sidebar-search-label" htmlFor="sidebar-quick-search">
             Quick search
           </label>
-          <div className="sidebar-search">
+          <form
+            className="sidebar-search"
+            onSubmit={(event) => {
+              event.preventDefault();
+              submitQuickSearch();
+            }}
+          >
             <MdSearch size={18} aria-hidden className="sidebar-search-icon" />
             <input
               id="sidebar-quick-search"
@@ -244,16 +291,16 @@ function Sidebar() {
               placeholder="Search parts…"
               className="sidebar-search-input"
               autoComplete="off"
+              value={quickSearch}
+              onChange={(event) => setQuickSearch(event.target.value)}
             />
-          </div>
+          </form>
         </div>
       )}
 
       <div className="sidebar-toolbar" aria-label="Account shortcuts">
         {shellRole === "admin" ? (
-          <Link href="/admin/alerts" className="sidebar-icon-btn" aria-label="Stock and billing alerts">
-            <MdNotificationsNone size={20} />
-          </Link>
+          <AdminNotificationBell />
         ) : (
           <button type="button" className="sidebar-icon-btn" aria-label="Notifications">
             <MdNotificationsNone size={20} />
@@ -285,9 +332,10 @@ function Sidebar() {
 
       <div className="sidebar-bottom">
         {shellRole !== "customer" && (
-          <button type="button" className="sidebar-new-sale">
-            + New Sale
-          </button>
+          <Link href="/pos" className="sidebar-new-sale">
+            <MdPointOfSale size={18} aria-hidden />
+            New Sale
+          </Link>
         )}
         <Link href="/help" className="sidebar-item">
           <MdHelp size={18} /> Help Center

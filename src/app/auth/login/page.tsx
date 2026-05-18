@@ -3,20 +3,11 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { API_BASE_URL } from "@/lib/api";
-import { getRolesFromToken, roleStringImpliesAdmin, roleStringImpliesStaff, safeInternalPath } from "@/lib/jwtRole";
-
-const API = API_BASE_URL;
-
-async function parseJsonSafe(res: Response): Promise<unknown> {
-    const text = await res.text();
-    if (!text) return null;
-    try {
-        return JSON.parse(text);
-    } catch {
-        return null;
-    }
-}
+import AuthFormHeader from "@/Components/auth/AuthFormHeader";
+import AuthPageShell from "@/Components/auth/AuthPageShell";
+import { apiFetch, extractApiError, parseJsonSafe } from "@/lib/http";
+import { getShellRoleFromToken, safeInternalPath } from "@/lib/jwtRole";
+import { persistAuthSession } from "@/lib/session";
 
 function extractToken(body: Record<string, unknown>): string | undefined {
     const direct = body.token ?? body.Token ?? body.accessToken ?? body.AccessToken;
@@ -28,20 +19,8 @@ function extractToken(body: Record<string, unknown>): string | undefined {
     return undefined;
 }
 
-function resolveUserKind(token: string, body: Record<string, unknown>): "admin" | "staff" | null {
-    const raw = body.role ?? body.Role;
-    if (typeof raw === "number") {
-        if (raw === 1) return "admin";
-        if (raw === 2) return "staff";
-    }
-    const s = String(raw ?? "").trim();
-    if (roleStringImpliesAdmin(s)) return "admin";
-    if (roleStringImpliesStaff(s)) return "staff";
-    for (const r of getRolesFromToken(token)) {
-        if (roleStringImpliesAdmin(r)) return "admin";
-        if (roleStringImpliesStaff(r)) return "staff";
-    }
-    return null;
+function isRecord(value: unknown): value is Record<string, unknown> {
+    return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
 export default function LoginPage() {
@@ -53,6 +32,7 @@ export default function LoginPage() {
     });
     const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
+    const [loading, setLoading] = useState(false);
     const [message, setMessage] = useState("");
 
     const submit = async () => {
@@ -61,99 +41,128 @@ export default function LoginPage() {
             return;
         }
         setMessage("");
+        setLoading(true);
         try {
-            const userRes = await fetch(`${API}/api/auth/login`, {
+            const userRes = await apiFetch("/api/auth/login", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ email: email.trim(), password }),
             });
-            const userData = (await parseJsonSafe(userRes)) as Record<string, unknown> | null;
+            const userData = await parseJsonSafe(userRes);
 
-            if (userRes.ok && userData) {
+            if (userRes.ok && isRecord(userData)) {
                 const token = extractToken(userData);
-                if (!token) {
-                    setMessage("Sign-in could not be completed.");
-                    return;
+                if (token) {
+                    const shell = getShellRoleFromToken(token);
+                    if (shell === "admin" || shell === "staff") {
+                        persistAuthSession(token);
+                        if (shell === "admin") {
+                            const dest = nextPath && nextPath.startsWith("/admin") ? nextPath : "/admin/parts";
+                            router.push(dest);
+                            return;
+                        }
+                        const staffDest =
+                            nextPath && (nextPath.startsWith("/staff") || nextPath.startsWith("/pos"))
+                                ? nextPath
+                                : "/staff/customers";
+                        router.push(staffDest);
+                        return;
+                    }
                 }
-                const kind = resolveUserKind(token, userData);
-                if (!kind) {
-                    setMessage("Sign-in could not be completed.");
-                    return;
-                }
-                localStorage.setItem("authToken", token);
-                localStorage.removeItem("customerId");
-                if (kind === "admin") {
-                    const dest = nextPath && nextPath.startsWith("/admin") ? nextPath : "/admin/parts";
-                    router.push(dest);
-                    return;
-                }
-                router.push(nextPath || "/staff/register");
-                return;
             }
 
-            const custRes = await fetch(`${API}/api/auth/customer/login`, {
+            const custRes = await apiFetch("/api/auth/customer/login", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ email: email.trim(), password }),
             });
-            const custData = (await parseJsonSafe(custRes)) as Record<string, unknown> | null;
+            const custData = await parseJsonSafe(custRes);
 
-            if (custRes.ok && custData) {
+            if (custRes.ok && isRecord(custData)) {
                 const token = (custData.token ?? custData.Token) as string | undefined;
-                const sessionId = (custData.customerId ?? custData.CustomerId ?? custData.userId ?? custData.id) as string | undefined;
-                if (token) localStorage.setItem("authToken", token);
-                if (sessionId) localStorage.setItem("customerId", String(sessionId));
-                router.push("/customer/profile");
-                return;
+                const sessionId = (custData.customerId ??
+                    custData.CustomerId ??
+                    custData.userId ??
+                    custData.id) as string | undefined;
+                if (token) {
+                    persistAuthSession(token, sessionId ? String(sessionId) : null);
+                    router.push(nextPath && nextPath.startsWith("/customer") ? nextPath : "/customer/profile");
+                    return;
+                }
             }
 
-            setMessage("Invalid email or password.");
+            const staffErr = isRecord(userData) ? extractApiError(userData, "") : "";
+            const custErr = isRecord(custData) ? extractApiError(custData, "") : "";
+            if (userRes.status === 401 && custRes.status === 401) {
+                setMessage("Invalid email or password.");
+                return;
+            }
+            setMessage(staffErr || custErr || "Invalid email or password.");
         } catch (error) {
             console.error(error);
             setMessage("Sign-in failed. Server is unreachable.");
+        } finally {
+            setLoading(false);
         }
     };
 
     return (
-        <main className="form-page">
-            <section className="form-card narrow">
-                <h1 className="form-title">Staff & Admin Login</h1>
-                <p className="form-subtitle">Enter your credentials to manage the portal.</p>
+        <AuthPageShell>
+            <form
+                className="auth-page-form"
+                onSubmit={(e) => {
+                    e.preventDefault();
+                    if (!loading) void submit();
+                }}
+            >
+                <AuthFormHeader title="Sign in">
+                    <p className="auth-page-lead">
+                        Admin, staff, and customer accounts all use this page. Enter the email and password for your
+                        role.
+                    </p>
+                </AuthFormHeader>
 
-                <div className="form-grid">
+                <div className="auth-page-field">
+                    <label htmlFor="login-email">Email</label>
                     <input
-                        className="form-input"
-                        placeholder="Email"
+                        id="login-email"
+                        className="auth-page-input"
+                        type="email"
+                        placeholder="you@example.com"
                         value={email}
                         onChange={(e) => setEmail(e.target.value)}
+                        autoComplete="email"
                     />
+                </div>
+
+                <div className="auth-page-field">
+                    <label htmlFor="login-password">Password</label>
                     <input
-                        className="form-input"
-                        placeholder="Password"
+                        id="login-password"
+                        className="auth-page-input"
                         type="password"
+                        placeholder="Your password"
                         value={password}
                         onChange={(e) => setPassword(e.target.value)}
+                        autoComplete="current-password"
                     />
-                    <button
-                        type="button"
-                        onClick={submit}
-                        className="form-button"
-                    >
-                        Sign in
+                </div>
+
+                <div className="auth-page-actions">
+                    <Link href="/auth/register" className="auth-page-link">
+                        New here? <strong>Create an account</strong>
+                    </Link>
+                    <button type="submit" className="auth-page-primary" disabled={loading}>
+                        {loading ? "Signing in…" : "Sign in"}
                     </button>
                 </div>
 
-                <div className="form-footer">
-                    <p>
-                        New here? <Link href="/auth/register" className="form-link">Create an account</Link>
-                    </p>
-                    <p style={{ marginTop: '8px' }}>
-                        Staff registration? <Link href="/auth/login?next=/staff/register" className="form-link-sub">Click here</Link>
-                    </p>
-                </div>
-
-                {message && <p className="form-message">{message}</p>}
-            </section>
-        </main>
+                {message && (
+                    <div className="auth-page-alert auth-page-alert-error" role="status">
+                        {message}
+                    </div>
+                )}
+            </form>
+        </AuthPageShell>
     );
 }

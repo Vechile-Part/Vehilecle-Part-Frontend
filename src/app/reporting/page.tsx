@@ -1,9 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { API_BASE_URL } from "@/lib/api";
-
-const API = API_BASE_URL;
+import { formatNpr } from "@/lib/currency";
+import { apiFetch, parseJsonSafe } from "@/lib/http";
 
 type Period = "daily" | "monthly" | "yearly";
 
@@ -27,13 +26,6 @@ type FinancialDashboard = {
   totalPendingCredits: number;
 };
 
-const authHeaders = (): HeadersInit => {
-  const token = typeof window !== "undefined" ? localStorage.getItem("authToken") : null;
-  const headers: Record<string, string> = { Accept: "application/json" };
-  if (token) headers.Authorization = `Bearer ${token}`;
-  return headers;
-};
-
 const mapBucket = (raw: unknown): FinancialBucket | null => {
   if (!raw || typeof raw !== "object") return null;
   const r = raw as Record<string, unknown>;
@@ -52,18 +44,7 @@ const mapBuckets = (raw: unknown): FinancialBucket[] => {
   return raw.map(mapBucket).filter((b): b is FinancialBucket => b !== null);
 };
 
-const parseJsonSafe = async (res: Response) => {
-  const text = await res.text();
-  if (!text) return null;
-  try {
-    return JSON.parse(text) as unknown;
-  } catch {
-    return null;
-  }
-};
-
-const money = (n: number) =>
-  new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", minimumFractionDigits: 2 }).format(n);
+const money = (n: number) => formatNpr(n);
 
 const formatRange = (rows: FinancialBucket[]) => {
   if (!rows.length) return "—";
@@ -83,7 +64,7 @@ export default function ReportingPage() {
     setLoading(true);
     setError("");
     try {
-      const res = await fetch(`${API}/api/admin/financial-dashboard/${period}`, { headers: authHeaders() });
+      const res = await apiFetch(`/api/admin/financial-dashboard/${period}`);
       const body = await parseJsonSafe(res);
       if (res.status === 401 || res.status === 403) {
         setData(null);
