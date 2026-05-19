@@ -200,10 +200,6 @@ export default function AdminPartsPage() {
   }, []);
 
   useEffect(() => {
-    void loadVendors();
-  }, [loadVendors]);
-
-  useEffect(() => {
     void loadParts();
   }, [loadParts]);
 

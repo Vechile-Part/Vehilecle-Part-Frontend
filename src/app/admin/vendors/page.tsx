@@ -166,10 +166,17 @@ export default function AdminVendorsPage() {
           });
       const data = await parseJsonSafe(res);
 
-      if (res.ok) {
+      if (res.ok && data) {
+        const savedVendor = normalizeVendor(data as Record<string, unknown>);
+        setVendors((prev) => {
+          if (editMode) {
+            return prev.map((v) => (v.id === currentId ? savedVendor : v));
+          } else {
+            return [savedVendor, ...prev];
+          }
+        });
         setShowModal(false);
         setMessage({ tone: "success", text: editMode ? "Vendor updated." : "Vendor added." });
-        await loadVendors();
       } else {
         setMessage({ tone: "error", text: extractApiError(data, "Could not save vendor.") });
       }
@@ -185,7 +192,7 @@ export default function AdminVendorsPage() {
       const data = await parseJsonSafe(res);
       if (res.ok) {
         setMessage({ tone: "success", text: "Vendor deleted." });
-        await loadVendors();
+        setVendors((prev) => prev.filter((v) => v.id !== id));
       } else {
         setMessage({ tone: "error", text: extractApiError(data, "Delete failed.") });
       }
