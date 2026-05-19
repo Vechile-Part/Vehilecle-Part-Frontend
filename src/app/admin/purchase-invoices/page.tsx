@@ -7,7 +7,7 @@ import { formatNpr } from "@/lib/currency";
 import "@/styles/pages/purchase-invoice.css";
 
 type VendorOption = { id: string; name: string };
-type PartOption = { id: string; name: string; partNumber: string; unitPrice: number };
+type PartOption = { id: string; name: string; partNumber: string; unitPrice: number; quantityInStock: number };
 
 type LineDraft = {
   rowId: string;
@@ -172,7 +172,7 @@ export default function AdminPurchaseInvoicesPage() {
     try {
       const [vendorRes, partRes, purchaseRes] = await Promise.all([
         apiFetch("/api/vendors"),
-        apiFetch("/api/parts"),
+        apiFetch("/api/admin/parts"),
         apiFetch("/api/purchase-invoices"),
       ]);
 
@@ -199,6 +199,7 @@ export default function AdminPurchaseInvoicesPage() {
                 name: readStr(r, "name", "Name"),
                 partNumber: readStr(r, "partNumber", "PartNumber"),
                 unitPrice: readNum(r, "unitPrice", "UnitPrice"),
+                quantityInStock: readNum(r, "quantityInStock", "QuantityInStock"),
               };
             })
           : [];
@@ -259,6 +260,16 @@ export default function AdminPurchaseInvoicesPage() {
       return;
     }
 
+    const invalidPrice = items.find((item) => item.unitPrice <= 0);
+    if (invalidPrice) {
+      const part = partById.get(invalidPrice.partId);
+      setStatus({
+        tone: "error",
+        text: `Enter a unit price greater than zero for ${part?.name ?? "the selected part"}.`,
+      });
+      return;
+    }
+
     setSubmitting(true);
     try {
       const res = await apiFetch("/api/purchase-invoices", {
@@ -272,7 +283,17 @@ export default function AdminPurchaseInvoicesPage() {
         return;
       }
 
-      setStatus({ tone: "success", text: "Purchase invoice recorded. Stock has been updated." });
+      const stockSummary = items
+        .map((item) => {
+          const part = partById.get(item.partId);
+          const before = part?.quantityInStock ?? 0;
+          return `${part?.name ?? "Part"}: ${before} → ${before + item.quantity}`;
+        })
+        .join(" · ");
+      setStatus({
+        tone: "success",
+        text: `Purchase saved. Stock updated — ${stockSummary}`,
+      });
       setVendorId("");
       setLines([{ rowId: rowId(), partId: "", quantity: 1, unitPrice: 0 }]);
       await loadAll();
@@ -344,7 +365,8 @@ export default function AdminPurchaseInvoicesPage() {
                 <option value="">Select part</option>
                 {parts.map((p) => (
                   <option key={p.id} value={p.id}>
-                    {p.name} {p.partNumber ? `(${p.partNumber})` : ""}
+                    {p.name}
+                    {p.partNumber ? ` (${p.partNumber})` : ""} — stock: {p.quantityInStock}
                   </option>
                 ))}
               </select>
@@ -360,13 +382,18 @@ export default function AdminPurchaseInvoicesPage() {
               <input
                 className="form-input"
                 type="number"
-                min={0}
+                min={0.01}
                 step="0.01"
                 value={line.unitPrice}
                 onChange={(e) => updateLine(line.rowId, { unitPrice: Number(e.target.value) })}
                 aria-label="Unit price"
                 placeholder="Unit price"
               />
+              {line.partId ? (
+                <span className="purchase-recent-muted" style={{ fontSize: "0.85rem", alignSelf: "center" }}>
+                  In stock: {partById.get(line.partId)?.quantityInStock ?? 0}
+                </span>
+              ) : null}
               <button type="button" className="action-btn" onClick={() => removeLine(line.rowId)} aria-label="Remove line">
                 <FiTrash2 />
               </button>
