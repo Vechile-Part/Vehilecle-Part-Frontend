@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { apiFetch, extractApiError, parseJsonSafe, readCustomerIdFromSession } from "@/lib/http";
 import {
+    formatNepalDateTime,
     getNepalDateParts,
     getNepalWeekday,
     isNepalDateBefore,
@@ -87,6 +88,25 @@ const MONTH_NAMES = [
     "December",
 ];
 
+const isCancellableStatus = (status: string) => {
+    const normalized = status.trim().toLowerCase();
+    return normalized === "pending" || normalized === "confirmed";
+};
+
+function parseAppointments(data: unknown): CustomerAppointment[] {
+    if (!Array.isArray(data)) return [];
+    return data.map((item) => {
+        const record = item as Record<string, unknown>;
+        return {
+            id: String(record.id ?? record.Id ?? ""),
+            appointmentDate: String(record.appointmentDate ?? record.AppointmentDate ?? ""),
+            serviceType: String(record.serviceType ?? record.ServiceType ?? ""),
+            status: String(record.status ?? record.Status ?? ""),
+            vehicleId: String(record.vehicleId ?? record.VehicleId ?? ""),
+        };
+    });
+}
+
 function slotMatchesBooked(slotUtc: Date | null, bookedIso: string[]): boolean {
     if (!slotUtc) return false;
     const slotMs = slotUtc.getTime();
@@ -110,6 +130,7 @@ function AppointmentPage() {
     const [bookedSlots, setBookedSlots] = useState<string[]>([]);
     const [loadingSlots, setLoadingSlots] = useState(false);
     const [status, setStatus] = useState<{ tone: "success" | "error"; text: string } | null>(null);
+    const [cancellingId, setCancellingId] = useState<string | null>(null);
 
     const selectedVehicle = useMemo(
         () => vehicles.find((v) => v.id === selectedVehicleId) ?? null,
@@ -120,6 +141,17 @@ function AppointmentPage() {
         if (!selectedVehicleId) return null;
         return lastServiceForVehicle(selectedVehicleId, pastAppointments);
     }, [selectedVehicleId, pastAppointments]);
+
+    const upcomingAppointments = useMemo(
+        () =>
+            pastAppointments
+                .filter((a) => a.id && isCancellableStatus(a.status))
+                .sort(
+                    (a, b) =>
+                        new Date(a.appointmentDate).getTime() - new Date(b.appointmentDate).getTime(),
+                ),
+        [pastAppointments],
+    );
 
     const daysInMonth = useMemo(
         () => new Date(viewYear, viewMonth + 1, 0).getDate(),
@@ -236,22 +268,7 @@ function AppointmentPage() {
 
                 if (appointmentsRes.ok) {
                     const appointmentsData = await parseJsonSafe(appointmentsRes);
-                    if (Array.isArray(appointmentsData)) {
-                        setPastAppointments(
-                            appointmentsData.map((item) => {
-                                const record = item as Record<string, unknown>;
-                                return {
-                                    id: String(record.id ?? record.Id ?? ""),
-                                    appointmentDate: String(
-                                        record.appointmentDate ?? record.AppointmentDate ?? "",
-                                    ),
-                                    serviceType: String(record.serviceType ?? record.ServiceType ?? ""),
-                                    status: String(record.status ?? record.Status ?? ""),
-                                    vehicleId: String(record.vehicleId ?? record.VehicleId ?? ""),
-                                };
-                            }),
-                        );
-                    }
+                    setPastAppointments(parseAppointments(appointmentsData));
                 }
             } catch {
                 setVehicles([]);
@@ -284,9 +301,55 @@ function AppointmentPage() {
         if (firstFree) setSelectedTime(firstFree);
     }, [bookedSlots, viewYear, viewMonth, selectedDay, selectedTime, slots]);
 
-    const handleCancel = () => {
+    const reloadAppointments = useCallback(async (customerId: string) => {
+        const refreshAppointments = await apiFetch(`/api/customers/${customerId}/appointments`);
+        const refreshData = await parseJsonSafe(refreshAppointments);
+        if (refreshAppointments.ok) {
+            setPastAppointments(parseAppointments(refreshData));
+        }
+    }, []);
+
+    const handleBack = () => {
         setStatus(null);
         router.push("/customer/dashboard");
+    };
+
+    const handleCancelAppointment = async (appointmentId: string) => {
+        const customerId = readCustomerIdFromSession();
+        if (!customerId) {
+            setStatus({ tone: "error", text: "You must be logged in to cancel an appointment." });
+            return;
+        }
+
+        if (!window.confirm("Cancel this appointment? The time slot will become available again.")) {
+            return;
+        }
+
+        setCancellingId(appointmentId);
+        setStatus(null);
+
+        try {
+            const response = await apiFetch(
+                `/api/customers/${customerId}/appointments/${appointmentId}/cancel`,
+                { method: "POST" },
+            );
+            const data = await parseJsonSafe(response);
+            if (response.ok) {
+                setStatus({ tone: "success", text: "Appointment cancelled." });
+                await Promise.all([reloadAppointments(customerId), loadBookedSlots()]);
+                return;
+            }
+
+            setStatus({
+                tone: "error",
+                text: extractApiError(data, "Could not cancel appointment. Please try again."),
+            });
+        } catch (error) {
+            console.error(error);
+            setStatus({ tone: "error", text: "Could not connect to server." });
+        } finally {
+            setCancellingId(null);
+        }
     };
 
     const changeMonth = (delta: number) => {
@@ -352,25 +415,7 @@ function AppointmentPage() {
                     tone: "success",
                     text: "Appointment requested. Staff will confirm your booking.",
                 });
-                await loadBookedSlots();
-                const refreshAppointments = await apiFetch(`/api/customers/${customerId}/appointments`);
-                const refreshData = await parseJsonSafe(refreshAppointments);
-                if (refreshAppointments.ok && Array.isArray(refreshData)) {
-                    setPastAppointments(
-                        refreshData.map((item) => {
-                            const record = item as Record<string, unknown>;
-                            return {
-                                id: String(record.id ?? record.Id ?? ""),
-                                appointmentDate: String(
-                                    record.appointmentDate ?? record.AppointmentDate ?? "",
-                                ),
-                                serviceType: String(record.serviceType ?? record.ServiceType ?? ""),
-                                status: String(record.status ?? record.Status ?? ""),
-                                vehicleId: String(record.vehicleId ?? record.VehicleId ?? ""),
-                            };
-                        }),
-                    );
-                }
+                await Promise.all([loadBookedSlots(), reloadAppointments(customerId)]);
                 return;
             }
 
@@ -434,6 +479,47 @@ function AppointmentPage() {
                                     </div>
                                 ) : null}
                             </>
+                        )}
+                    </div>
+
+                    <div className="card">
+                        <h2>Your appointments</h2>
+                        {loadingVehicles ? (
+                            <p className="vehicle-subtitle" style={{ marginTop: "1rem" }}>
+                                Loading…
+                            </p>
+                        ) : upcomingAppointments.length === 0 ? (
+                            <p className="vehicle-subtitle" style={{ marginTop: "1rem" }}>
+                                No upcoming pending or confirmed bookings.
+                            </p>
+                        ) : (
+                            <ul className="my-appointments-list">
+                                {upcomingAppointments.map((appointment) => {
+                                    const vehicle = vehicles.find((v) => v.id === appointment.vehicleId);
+                                    return (
+                                        <li key={appointment.id} className="my-appointment-item">
+                                            <div className="my-appointment-details">
+                                                <p className="my-appointment-service">{appointment.serviceType}</p>
+                                                <p className="vehicle-subtitle">
+                                                    {formatNepalDateTime(appointment.appointmentDate)}
+                                                </p>
+                                                {vehicle ? (
+                                                    <p className="vehicle-subtitle">{vehicle.vehicleNumber}</p>
+                                                ) : null}
+                                                <p className="my-appointment-status">{appointment.status}</p>
+                                            </div>
+                                            <button
+                                                type="button"
+                                                className="appointment-cancel-btn"
+                                                disabled={cancellingId === appointment.id}
+                                                onClick={() => void handleCancelAppointment(appointment.id)}
+                                            >
+                                                {cancellingId === appointment.id ? "Cancelling…" : "Cancel"}
+                                            </button>
+                                        </li>
+                                    );
+                                })}
+                            </ul>
                         )}
                     </div>
 
@@ -561,8 +647,8 @@ function AppointmentPage() {
                     )}
 
                     <div className="button-group">
-                        <button type="button" className="cancel-btn" onClick={handleCancel}>
-                            Cancel
+                        <button type="button" className="cancel-btn" onClick={handleBack}>
+                            Back to dashboard
                         </button>
                         <button
                             type="button"

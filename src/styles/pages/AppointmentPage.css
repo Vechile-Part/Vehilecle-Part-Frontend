@@ -243,3 +243,51 @@
     color: white;
     cursor: pointer;
 }
+
+.my-appointments-list {
+    list-style: none;
+    margin: 1rem 0 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.my-appointment-item {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 12px;
+    border-radius: 12px;
+    background: #f8ead4;
+}
+
+.my-appointment-service {
+    font-weight: 600;
+    margin: 0 0 4px;
+    color: #4b321d;
+}
+
+.my-appointment-status {
+    margin: 6px 0 0;
+    font-size: 13px;
+    text-transform: capitalize;
+    color: #555;
+}
+
+.appointment-cancel-btn {
+    flex-shrink: 0;
+    padding: 8px 14px;
+    border-radius: 10px;
+    border: 1px solid #c44;
+    background: white;
+    color: #a33;
+    cursor: pointer;
+    font-size: 14px;
+}
+
+.appointment-cancel-btn:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+}
