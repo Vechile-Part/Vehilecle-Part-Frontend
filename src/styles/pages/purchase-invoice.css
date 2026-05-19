@@ -872,3 +872,133 @@
     color: #6f5a45;
 }
 
+.purchase-recent-section {
+    margin-top: 1.5rem;
+    border: 1px solid #eadfcd;
+    border-radius: 16px;
+    background: #fffdf8;
+    overflow: hidden;
+}
+
+.purchase-recent-head {
+    padding: 16px 18px 0;
+}
+
+.purchase-recent-title {
+    margin: 0;
+    font-size: 1.05rem;
+    font-weight: 700;
+    color: #2a1c0f;
+}
+
+.purchase-recent-table-wrap {
+    overflow-x: auto;
+    padding: 12px 14px 16px;
+}
+
+.purchase-recent-table {
+    width: 100%;
+    min-width: 640px;
+    border-collapse: collapse;
+}
+
+.purchase-recent-table th {
+    padding: 10px 12px;
+    text-align: left;
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: #8a7358;
+    border-bottom: 1px solid #eadfcd;
+}
+
+.purchase-recent-table td {
+    padding: 14px 12px;
+    vertical-align: top;
+    border-bottom: 1px solid #f1e7d8;
+    font-size: 0.9rem;
+    color: #3d2817;
+}
+
+.purchase-recent-table tbody tr:last-child td {
+    border-bottom: none;
+}
+
+.purchase-recent-empty {
+    text-align: center;
+    padding: 2rem 1rem !important;
+    color: #8a7358;
+}
+
+.purchase-recent-date {
+    white-space: nowrap;
+    min-width: 110px;
+}
+
+.purchase-recent-date-main {
+    display: block;
+    font-weight: 600;
+}
+
+.purchase-recent-date-sub {
+    display: block;
+    margin-top: 2px;
+    font-size: 0.78rem;
+    color: #8a7358;
+}
+
+.purchase-recent-vendor {
+    font-weight: 600;
+    min-width: 100px;
+}
+
+.purchase-recent-total {
+    font-weight: 700;
+    white-space: nowrap;
+    text-align: right;
+}
+
+.purchase-recent-muted {
+    color: #8a7358;
+}
+
+.purchase-recent-parts {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    display: grid;
+    gap: 8px;
+    min-width: 200px;
+}
+
+.purchase-recent-parts li {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 6px 10px;
+}
+
+.purchase-recent-part-name {
+    font-weight: 600;
+    color: #2a1c0f;
+}
+
+.purchase-recent-part-code {
+    font-size: 0.78rem;
+    color: #8a7358;
+    font-family: ui-monospace, monospace;
+}
+
+.purchase-recent-part-qty {
+    font-size: 0.82rem;
+    color: #6f5a45;
+}
+
+.purchase-recent-part-amt {
+    margin-left: auto;
+    font-weight: 600;
+    font-size: 0.88rem;
+    color: #3d2817;
+}
+

@@ -147,7 +147,6 @@ export const dedupeCustomers = (customers: SearchCustomer[]) => {
   });
 };
 
-/** UI shows plates as "BA 66 pa 6815 | 2025" — search only the plate portion. */
 export const normalizeVehicleSearchTerm = (query: string) => {
   const trimmed = query.trim();
   const pipeYear = trimmed.match(/^(.+?)\s*\|\s*\d{4}\s*$/);
@@ -190,6 +189,24 @@ export const searchByCustomerId = async (customerId: string): Promise<SearchResu
     customerId,
   });
   return searchCustomersApi(params);
+};
+
+
+export const loadStaffCustomerDirectory = async (): Promise<SearchResult> => {
+  const response = await apiFetch("/api/staff/customers");
+  const data = await parseJsonSafe(response);
+
+  if (!response.ok) {
+    return {
+      customers: [],
+      error: readApiErrorMessage(data, response.status, "Could not load the customer list."),
+    };
+  }
+
+  return {
+    customers: normalizeAdminCustomerList(data),
+    error: null,
+  };
 };
 
 export const vehiclesFromSearchSummary = (summary: SearchCustomer): VehicleItem[] => {

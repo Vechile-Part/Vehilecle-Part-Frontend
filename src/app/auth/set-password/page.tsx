@@ -10,6 +10,7 @@ import { apiFetch, extractApiError, parseJsonSafe } from "@/lib/http";
 function SetPasswordForm() {
     const searchParams = useSearchParams();
     const tokenFromUrl = searchParams.get("token") ?? "";
+    const isStaffInvite = searchParams.get("kind") === "staff";
     const [password, setPassword] = useState("");
     const [confirm, setConfirm] = useState("");
     const [loading, setLoading] = useState(false);
@@ -34,7 +35,10 @@ function SetPasswordForm() {
 
         setLoading(true);
         try {
-            const res = await apiFetch("/api/auth/customer/complete-invite-password", {
+            const endpoint = isStaffInvite
+                ? "/api/auth/staff/complete-invite-password"
+                : "/api/auth/customer/complete-invite-password";
+            const res = await apiFetch(endpoint, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ token: tokenFromUrl.trim(), newPassword: password }),
@@ -64,12 +68,17 @@ function SetPasswordForm() {
             >
                 <AuthFormHeader title="Set your password">
                     <p className="auth-page-lead">
-                        An account was started for you at the workshop. Choose a password to finish. To register
-                        yourself instead, use{" "}
-                        <Link href="/auth/register" className="auth-page-foot-link">
-                            create an account
-                        </Link>
-                        .
+                        {isStaffInvite
+                            ? "Your PartTrack staff account was created by an administrator. Choose a password to finish."
+                            : "An account was started for you at the workshop. Choose a password to finish. To register yourself instead, use "}
+                        {!isStaffInvite && (
+                            <>
+                                <Link href="/auth/register" className="auth-page-foot-link">
+                                    create an account
+                                </Link>
+                                .
+                            </>
+                        )}
                     </p>
                 </AuthFormHeader>
 

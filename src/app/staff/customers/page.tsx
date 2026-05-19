@@ -7,10 +7,8 @@ export default function StaffCustomersPage() {
   return (
     <Suspense
       fallback={
-        <section className="customer-directory-page">
-          <div className="customer-directory-utility-row">
-            <div className="customer-directory-status info">Loading customer directory...</div>
-          </div>
+        <section className="admin-page customer-directory-page">
+          <p className="admin-page-subtitle">Loading customers…</p>
         </section>
       }
     >

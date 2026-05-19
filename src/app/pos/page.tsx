@@ -286,6 +286,9 @@ export default function SalesPosPage() {
 
       const invoiceId = String(record.id ?? record.Id ?? "");
       const invoiceNumber = String(record.invoiceNumber ?? record.InvoiceNumber ?? "");
+      const emailSent = Boolean(record.emailSent ?? record.EmailSent);
+      const emailError = String(record.emailError ?? record.EmailError ?? "");
+
       setCreatedInvoice({
         id: invoiceId,
         invoiceNumber: invoiceNumber || invoiceId.slice(0, 8).toUpperCase(),
@@ -296,7 +299,14 @@ export default function SalesPosPage() {
         pendingCredit: Number(record.pendingCredit ?? record.PendingCredit ?? 0),
         items,
       });
-      setStatus({ tone: "success", text: "Sales invoice created and stock updated." });
+
+      let successText = "Sales invoice created and stock updated.";
+      if (emailSent) {
+        successText += " Invoice emailed to the customer.";
+      } else if (emailError) {
+        successText += ` Email was not sent: ${emailError}`;
+      }
+      setStatus({ tone: emailSent || !emailError ? "success" : "error", text: successText });
       setCart([]);
       setPaidAmount(0);
       setDiscountAmount(0);
@@ -681,7 +691,7 @@ export default function SalesPosPage() {
                   className="sales-pos-btn-secondary-link"
                   onClick={() => void sendInvoiceEmail()}
                 >
-                  Email invoice
+                  Resend invoice email
                 </button>
                 <Link
                   href={`/staff/invoices?invoiceId=${createdInvoice.id}`}

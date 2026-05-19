@@ -1,0 +1,132 @@
+.role-dashboard {
+  width: 100%;
+  max-width: 960px;
+  margin: 0 auto;
+}
+
+.role-dashboard-header {
+  margin-bottom: 24px;
+}
+
+.role-dashboard-title {
+  margin: 0;
+  color: #3d2817;
+  font-size: clamp(1.35rem, 2.5vw, 1.65rem);
+  line-height: 1.2;
+}
+
+.role-dashboard-subtitle {
+  margin: 8px 0 0;
+  color: #6f5a45;
+  font-size: 0.95rem;
+  line-height: 1.5;
+  max-width: 48ch;
+}
+
+.role-dashboard-greeting {
+  margin: 12px 0 0;
+  font-size: 1rem;
+  color: #3d2817;
+  font-weight: 600;
+}
+
+.role-dashboard-error {
+  margin: 0 0 16px;
+  padding: 12px 14px;
+  border-radius: 10px;
+  background: #fdecea;
+  color: #9b2c1f;
+  font-size: 0.9rem;
+}
+
+.role-dashboard-kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 180px), 1fr));
+  gap: 14px;
+  margin-bottom: 24px;
+}
+
+.role-kpi-card {
+  padding: 18px 16px;
+  border: 1px solid #eadfcd;
+  border-radius: 12px;
+  background: #fffdf8;
+}
+
+.role-kpi-label {
+  margin: 0;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: #8a7358;
+}
+
+.role-kpi-value {
+  margin: 8px 0 0;
+  font-size: 1.65rem;
+  font-weight: 700;
+  color: #3d2817;
+  line-height: 1.15;
+}
+
+.role-kpi-value--alert {
+  color: #c63121;
+}
+
+.role-kpi-hint {
+  margin: 6px 0 0;
+  font-size: 0.85rem;
+  color: #6f5a45;
+}
+
+.role-kpi-link {
+  display: inline-block;
+  margin-top: 10px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #83512e;
+  text-decoration: none;
+}
+
+.role-kpi-link:hover {
+  text-decoration: underline;
+}
+
+.role-dashboard-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.role-dashboard-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 42px;
+  padding: 10px 18px;
+  border-radius: 10px;
+  border: 1px solid #dccbb1;
+  background: #fffdf8;
+  color: #3d2817;
+  font-size: 0.9rem;
+  font-weight: 600;
+  text-decoration: none;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.role-dashboard-btn:hover {
+  background: #f5ead8;
+  border-color: #c9b08a;
+}
+
+.role-dashboard-btn--primary {
+  background: #83512e;
+  border-color: #83512e;
+  color: #fffdf8;
+}
+
+.role-dashboard-btn--primary:hover {
+  background: #6b4225;
+  border-color: #6b4225;
+}

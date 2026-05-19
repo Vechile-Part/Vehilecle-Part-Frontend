@@ -282,7 +282,7 @@ function SalesInvoicesContent() {
           </div>
         </div>
 
-        <article className="sales-invoices-detail-card">
+        <article className="sales-invoices-detail-card" id="sales-invoice-print">
           {!selectedId || !isUuid(selectedId) ? (
             <p className="sales-invoices-detail-empty">Select an invoice from the list to view details.</p>
           ) : loadingDetail || !detail ? (
@@ -297,6 +297,10 @@ function SalesInvoicesContent() {
             </p>
           ) : (
             <>
+              <div className="sales-invoices-print-brand">
+                <strong>PartTrack</strong>
+                <span>Vehicle Parts &amp; Service · Sales invoice</span>
+              </div>
               <div className="sales-invoices-detail-head">
                 <h2>Invoice {invoiceRef(detail.id, detail.invoiceNumber)}</h2>
                 <p className="sales-invoices-detail-id">{detail.id}</p>

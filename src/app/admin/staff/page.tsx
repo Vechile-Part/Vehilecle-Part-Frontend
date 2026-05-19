@@ -18,7 +18,6 @@ type StaffForm = {
   fullName: string;
   email: string;
   phone: string;
-  password: string;
 };
 
 const displayName = (s: StaffMember) =>
@@ -52,7 +51,7 @@ export default function AdminStaffPage() {
   const [showModal, setShowModal] = useState(false);
   const [editMode, setEditMode] = useState(false);
   const [currentId, setCurrentId] = useState("");
-  const [formData, setFormData] = useState<StaffForm>({ fullName: "", email: "", phone: "", password: "" });
+  const [formData, setFormData] = useState<StaffForm>({ fullName: "", email: "", phone: "" });
   const [roleForm, setRoleForm] = useState({ userId: "", newRole: 2 });
   const [status, setStatus] = useState<{ tone: "success" | "error"; text: string } | null>(null);
 
@@ -109,7 +108,7 @@ export default function AdminStaffPage() {
   const openAddModal = () => {
     setEditMode(false);
     setCurrentId("");
-    setFormData({ fullName: "", email: "", phone: "", password: "" });
+    setFormData({ fullName: "", email: "", phone: "" });
     setShowModal(true);
   };
 
@@ -119,7 +118,6 @@ export default function AdminStaffPage() {
       fullName: displayName(s) === "—" ? "" : displayName(s),
       email: s.email ?? "",
       phone: s.phone || "",
-      password: "",
     });
     setEditMode(true);
     setShowModal(true);
@@ -127,11 +125,10 @@ export default function AdminStaffPage() {
 
   const handleSave = async () => {
     const finalPhone = formData.phone.trim() || "0000000000";
-    const finalPassword = formData.password.trim() || "Password123!";
 
     const payload = editMode
       ? { userId: currentId, fullName: formData.fullName, email: formData.email, phone: finalPhone }
-      : { fullName: formData.fullName, email: formData.email, phone: finalPhone, password: finalPassword };
+      : { fullName: formData.fullName, email: formData.email, phone: finalPhone };
 
     try {
       const res = editMode
@@ -154,7 +151,9 @@ export default function AdminStaffPage() {
 
       setStatus({
         tone: "success",
-        text: editMode ? "Staff updated successfully." : `Staff registered. Password: ${finalPassword}`,
+        text: editMode
+          ? "Staff updated successfully."
+          : "Staff registered. A password setup link was sent to their email.",
       });
       setShowModal(false);
       await loadStaff();
@@ -243,13 +242,9 @@ export default function AdminStaffPage() {
                 onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
               />
               {!editMode && (
-                <input
-                  type="password"
-                  className="form-input"
-                  placeholder="Password (default: Password123!)"
-                  value={formData.password}
-                  onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                />
+                <p style={{ margin: 0, color: "#5c4a3a", fontSize: "14px" }}>
+                  An email with a secure link will be sent so they can set their own password.
+                </p>
               )}
               <button type="button" className="form-button" onClick={() => void handleSave()}>
                 {editMode ? "Confirm Changes" : "Register Staff"}

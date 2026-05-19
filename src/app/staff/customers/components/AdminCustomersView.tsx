@@ -3,6 +3,7 @@
 import type { SearchCustomer } from "../lib/types";
 
 type AdminCustomersViewProps = {
+  variant?: "admin" | "staff";
   adminListLoading: boolean;
   directoryCount: number;
   searchError: string | null;
@@ -16,6 +17,7 @@ type AdminCustomersViewProps = {
 };
 
 export function AdminCustomersView({
+  variant = "admin",
   adminListLoading,
   directoryCount,
   searchError,
@@ -27,6 +29,11 @@ export function AdminCustomersView({
   onRefresh,
   onOpenCustomer,
 }: AdminCustomersViewProps) {
+  const rowHint =
+    variant === "staff"
+      ? "Click a row to view purchase history, vehicles, and invoices."
+      : "Click a row to open customer details.";
+
   return (
     <>
       <header className="admin-page-header">
@@ -35,7 +42,7 @@ export function AdminCustomersView({
           <p className="admin-page-subtitle">
             {adminListLoading
               ? "Loading customers…"
-              : `${directoryCount} customer${directoryCount === 1 ? "" : "s"} in the database. Click a row to open the customer directory.`}
+              : `${directoryCount} customer${directoryCount === 1 ? "" : "s"} in the database. ${rowHint}`}
           </p>
         </div>
         <div className="admin-page-actions">
@@ -50,7 +57,7 @@ export function AdminCustomersView({
       <div className="form-card" style={{ maxWidth: "none", marginBottom: "1rem" }}>
         <input
           className="form-input"
-          placeholder="Search by name, email, phone, or customer ID"
+          placeholder="Search by name, email, phone, vehicle number, or customer ID"
           value={adminTableSearch}
           onChange={(event) => onAdminTableSearchChange(event.target.value)}
           style={{ maxWidth: "420px" }}

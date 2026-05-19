@@ -67,7 +67,7 @@ function ReviewPage() {
     if (!canReview) {
       setStatus({
         tone: "error",
-        text: "You can only review a service after your appointment has taken place.",
+        text: "You can only review a service after staff marks your visit as completed.",
       });
       return;
     }
@@ -125,7 +125,9 @@ function ReviewPage() {
   return (
     <div className="review-page">
       <h1 className="review-title">Review a Service</h1>
-      <p className="review-subtitle">Share your experience after a completed service appointment.</p>
+      <p className="review-subtitle">
+        Share your experience after staff marks your service appointment as completed.
+      </p>
 
       <div className="review-card">
         {status && (
@@ -140,8 +142,8 @@ function ReviewPage() {
             <p className="review-no-appointments">Loading services…</p>
           ) : !canReview ? (
             <p className="review-no-appointments">
-              You have no completed services to review yet. Book an appointment and return after the service has taken
-              place.
+              You have no completed services to review yet. After your visit, staff will mark the appointment completed
+              and it will appear here.
             </p>
           ) : (
             <select

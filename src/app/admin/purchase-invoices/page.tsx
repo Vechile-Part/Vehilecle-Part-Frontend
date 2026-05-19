@@ -283,9 +283,13 @@ export default function AdminPurchaseInvoicesPage() {
     }
   };
 
-  const formatDate = (value: string) => {
+  const formatPurchaseWhen = (value: string) => {
     const d = new Date(value);
-    return Number.isNaN(d.getTime()) ? value : d.toLocaleString();
+    if (Number.isNaN(d.getTime())) return { date: value, time: "" };
+    return {
+      date: d.toLocaleDateString("en-NP", { day: "numeric", month: "short", year: "numeric" }),
+      time: d.toLocaleTimeString("en-NP", { hour: "2-digit", minute: "2-digit" }),
+    };
   };
 
   const sortedPurchases = useMemo(
@@ -384,73 +388,71 @@ export default function AdminPurchaseInvoicesPage() {
         </div>
       </section>
 
-      <section className="form-card inventory-container" style={{ maxWidth: "none", marginTop: "1.5rem", padding: 0, overflow: "hidden" }}>
-        <h2 style={{ padding: "1rem 1rem 0", margin: 0, fontSize: "1.1rem" }}>Recent vendor purchases</h2>
-        <div className="inventory-table-scroll">
-          <table className="inventory-table">
-            <thead style={{ background: "#f9f6f0" }}>
+      <section className="purchase-recent-section">
+        <header className="purchase-recent-head">
+          <h2 className="purchase-recent-title">Recent purchases</h2>
+        </header>
+        <div className="purchase-recent-table-wrap">
+          <table className="purchase-recent-table">
+            <thead>
               <tr>
                 <th>Date</th>
                 <th>Vendor</th>
-                <th>Items purchased</th>
+                <th>Parts</th>
                 <th>Total</th>
               </tr>
             </thead>
             <tbody>
               {loadingRecent ? (
                 <tr>
-                  <td colSpan={4} style={{ textAlign: "center", padding: "2rem" }}>
+                  <td colSpan={4} className="purchase-recent-empty">
                     Loading…
                   </td>
                 </tr>
               ) : sortedPurchases.length === 0 ? (
                 <tr>
-                  <td colSpan={4} style={{ textAlign: "center", padding: "2rem" }}>
-                    No vendor purchases yet. Save a purchase above to see it here.
+                  <td colSpan={4} className="purchase-recent-empty">
+                    No purchases yet.
                   </td>
                 </tr>
               ) : (
-                sortedPurchases
-                  .map((purchase) => (
+                sortedPurchases.map((purchase) => {
+                  const when = formatPurchaseWhen(purchase.issuedAtUtc);
+                  return (
                     <tr key={purchase.id}>
-                      <td data-label="Date">{formatDate(purchase.issuedAtUtc)}</td>
-                      <td data-label="Vendor">
-                        <div style={{ fontWeight: 600 }}>{purchase.vendorName}</div>
-                        {purchase.vendorContactPerson ? (
-                          <div style={{ fontSize: "12px", color: "#6f5a45" }}>{purchase.vendorContactPerson}</div>
-                        ) : null}
-                        {purchase.vendorPhone ? (
-                          <div style={{ fontSize: "12px", color: "#6f5a45" }}>{purchase.vendorPhone}</div>
-                        ) : null}
-                        {purchase.vendorEmail ? (
-                          <div style={{ fontSize: "12px", color: "#6f5a45" }}>{purchase.vendorEmail}</div>
-                        ) : null}
+                      <td data-label="Date" className="purchase-recent-date">
+                        <span className="purchase-recent-date-main">{when.date}</span>
+                        {when.time ? <span className="purchase-recent-date-sub">{when.time}</span> : null}
                       </td>
-                      <td data-label="Items purchased">
+                      <td data-label="Vendor" className="purchase-recent-vendor">
+                        {purchase.vendorName}
+                      </td>
+                      <td data-label="Parts">
                         {purchase.items.length === 0 ? (
-                          <span style={{ color: "#6f5a45" }}>—</span>
+                          <span className="purchase-recent-muted">—</span>
                         ) : (
-                          <ul className="purchase-invoice-history-items">
-                            {purchase.items.map((item, index) => {
-                              const lineTotal = item.quantity * item.unitPrice;
-                              const label = item.partNumber
-                                ? `${item.partName} (${item.partNumber})`
-                                : item.partName;
-                              return (
-                                <li key={`${purchase.id}-${item.partId}-${index}`}>
-                                  <span className="purchase-invoice-history-item-name">{label}</span>
-                                  <span className="purchase-invoice-history-item-meta">
-                                    {item.quantity} × {formatNpr(item.unitPrice)} = {formatNpr(lineTotal)}
-                                  </span>
-                                </li>
-                              );
-                            })}
+                          <ul className="purchase-recent-parts">
+                            {purchase.items.map((item, index) => (
+                              <li key={`${purchase.id}-${item.partId}-${index}`}>
+                                <span className="purchase-recent-part-name">{item.partName}</span>
+                                {item.partNumber ? (
+                                  <span className="purchase-recent-part-code">{item.partNumber}</span>
+                                ) : null}
+                                <span className="purchase-recent-part-qty">×{item.quantity}</span>
+                                <span className="purchase-recent-part-amt">
+                                  {formatNpr(item.quantity * item.unitPrice)}
+                                </span>
+                              </li>
+                            ))}
                           </ul>
                         )}
                       </td>
-                      <td data-label="Total">{formatNpr(purchase.totalAmount)}</td>
+                      <td data-label="Total" className="purchase-recent-total">
+                        {formatNpr(purchase.totalAmount)}
+                      </td>
                     </tr>
-                  ))
+                  );
+                })
               )}
             </tbody>
           </table>

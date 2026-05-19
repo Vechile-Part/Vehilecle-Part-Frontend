@@ -1,0 +1,150 @@
+.staff-appointments-page {
+  width: 100%;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.staff-appointments-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 18px;
+}
+
+.staff-appointments-filter-btn {
+  min-height: 36px;
+  padding: 0 14px;
+  border-radius: 999px;
+  border: 1px solid #dccbb1;
+  background: #fffdf8;
+  color: #5a4733;
+  font: inherit;
+  font-size: 0.88rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.staff-appointments-filter-btn.active {
+  background: #83512e;
+  border-color: #83512e;
+  color: #fffdf8;
+}
+
+.staff-appointments-table-wrap {
+  border: 1px solid #eadfcd;
+  border-radius: 14px;
+  background: #fffdf8;
+  overflow-x: auto;
+}
+
+.staff-appointments-table {
+  width: 100%;
+  min-width: 880px;
+  border-collapse: collapse;
+}
+
+.staff-appointments-table th {
+  padding: 12px 14px;
+  text-align: left;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #8a7358;
+  background: #fdfbf7;
+  border-bottom: 1px solid #eadfcd;
+}
+
+.staff-appointments-table td {
+  padding: 14px;
+  vertical-align: middle;
+  border-bottom: 1px solid #f1e7d8;
+  font-size: 0.9rem;
+  color: #3d2817;
+}
+
+.staff-appointments-table tr:last-child td {
+  border-bottom: none;
+}
+
+.staff-appointments-customer strong {
+  display: block;
+  color: #2a1c0f;
+}
+
+.staff-appointments-customer span {
+  display: block;
+  margin-top: 2px;
+  font-size: 0.82rem;
+  color: #8a7358;
+}
+
+.staff-appointments-status-select {
+  min-width: 130px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  border: 1px solid #dccbb1;
+  background: #fffaf1;
+  font: inherit;
+  font-size: 0.88rem;
+  color: #3d2817;
+}
+
+.staff-appointments-save-btn {
+  min-height: 36px;
+  padding: 0 12px;
+  border-radius: 8px;
+  border: 1px solid #83512e;
+  background: #83512e;
+  color: #fffdf8;
+  font: inherit;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.staff-appointments-save-btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.staff-appointment-status-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: capitalize;
+}
+
+.staff-appointment-status-badge.pending {
+  background: #fff0c7;
+  color: #8c6420;
+}
+
+.staff-appointment-status-badge.confirmed {
+  background: #e3edf8;
+  color: #2a4f73;
+}
+
+.staff-appointment-status-badge.completed {
+  background: #e7f0e5;
+  color: #2d5e2e;
+}
+
+.staff-appointment-status-badge.noshow {
+  background: #fdecea;
+  color: #9b2c1f;
+}
+
+.staff-appointment-status-badge.cancelled {
+  background: #efe8e0;
+  color: #6f5a45;
+}
+
+.staff-appointments-empty {
+  padding: 32px 20px;
+  text-align: center;
+  color: #8a7358;
+}

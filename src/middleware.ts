@@ -18,9 +18,9 @@ function homeForRole(role: ShellRole): string {
     case "admin":
       return "/admin/dashboard";
     case "staff":
-      return "/staff/customers";
+      return "/staff/dashboard";
     case "customer":
-      return "/customer/profile";
+      return "/customer/dashboard";
   }
 }
 
@@ -81,7 +81,11 @@ export function middleware(request: NextRequest) {
   }
 
   if (isSettingsRoute && role === "customer") {
-    return NextResponse.redirect(new URL("/customer/profile", request.url));
+    return NextResponse.redirect(new URL("/customer/dashboard", request.url));
+  }
+
+  if (isSettingsRoute && role === "staff") {
+    return NextResponse.redirect(new URL("/staff/profile", request.url));
   }
 
   return NextResponse.next();

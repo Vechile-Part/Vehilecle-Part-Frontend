@@ -58,14 +58,14 @@ export default function LoginPage() {
                     if (shell === "admin" || shell === "staff") {
                         login(token);
                         if (shell === "admin") {
-                            const dest = nextPath && nextPath.startsWith("/admin") ? nextPath : "/admin/parts";
+                            const dest = nextPath && nextPath.startsWith("/admin") ? nextPath : "/admin/dashboard";
                             router.push(dest);
                             return;
                         }
                         const staffDest =
                             nextPath && (nextPath.startsWith("/staff") || nextPath.startsWith("/pos"))
                                 ? nextPath
-                                : "/staff/customers";
+                                : "/staff/dashboard";
                         router.push(staffDest);
                         return;
                     }
@@ -87,7 +87,7 @@ export default function LoginPage() {
                     custData.id) as string | undefined;
                 if (token) {
                     login(token, sessionId ? String(sessionId) : null);
-                    router.push(nextPath && nextPath.startsWith("/customer") ? nextPath : "/customer/profile");
+                    router.push(nextPath && nextPath.startsWith("/customer") ? nextPath : "/customer/dashboard");
                     return;
                 }
             }

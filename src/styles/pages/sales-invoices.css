@@ -318,20 +318,118 @@
   color: #746350;
 }
 
+.sales-invoices-print-brand {
+  display: none;
+}
+
 @media print {
+  @page {
+    margin: 14mm;
+    size: A4;
+  }
+
+  html,
+  body {
+    background: #fff !important;
+    height: auto !important;
+    overflow: visible !important;
+  }
+
+  .sidebar,
+  .sales-invoices-header,
+  .sales-invoices-status,
   .sales-invoices-list-card,
   .sales-invoices-toolbar,
   .sales-invoices-actions,
-  .sales-invoices-search {
+  .sales-invoices-search,
+  .sales-invoices-detail-id {
     display: none !important;
   }
 
+  .layout-body,
+  .layout-content,
+  .layout-main {
+    display: block !important;
+    width: 100% !important;
+    max-width: none !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    overflow: visible !important;
+    background: #fff !important;
+    border: none !important;
+    box-shadow: none !important;
+  }
+
+  .sales-invoices-page {
+    max-width: none !important;
+    padding: 0 !important;
+    margin: 0 !important;
+  }
+
   .sales-invoices-layout {
-    grid-template-columns: 1fr;
+    display: block !important;
+    gap: 0 !important;
   }
 
   .sales-invoices-detail-card {
-    position: static;
-    border: none;
+    position: static !important;
+    width: 100% !important;
+    max-width: none !important;
+    border: none !important;
+    border-radius: 0 !important;
+    background: #fff !important;
+    box-shadow: none !important;
+    page-break-inside: avoid;
+  }
+
+  .sales-invoices-print-brand {
+    display: block !important;
+    margin-bottom: 16px;
+    padding-bottom: 12px;
+    border-bottom: 2px solid #2a1c0f;
+  }
+
+  .sales-invoices-print-brand strong {
+    display: block;
+    font-size: 1.35rem;
+    color: #1f140b;
+  }
+
+  .sales-invoices-print-brand span {
+    font-size: 0.85rem;
+    color: #6f5a45;
+  }
+
+  .sales-invoices-detail-head {
+    background: #fff !important;
+    border-bottom: 1px solid #ccc !important;
+    padding-top: 0 !important;
+  }
+
+  .sales-invoices-detail-body {
+    padding-left: 0 !important;
+    padding-right: 0 !important;
+  }
+
+  .sales-invoices-lines,
+  .sales-invoices-totals {
+    border-color: #bbb !important;
+  }
+
+  .sales-invoices-lines-head {
+    background: #f0f0f0 !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  .sales-invoices-total-row.grand {
+    background: #2a1c0f !important;
+    color: #fff !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  .sales-invoices-total-row.grand strong {
+    color: #fff !important;
   }
 }

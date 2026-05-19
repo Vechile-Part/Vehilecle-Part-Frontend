@@ -5,11 +5,11 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { apiFetch, isUuid } from "@/lib/http";
 import { AdminCustomersView } from "./components/AdminCustomersView";
 import { CustomerDetailModal } from "./components/CustomerDetailModal";
-import { StaffDirectoryView } from "./components/StaffDirectoryView";
 import { PAGE_SIZE, EMPTY_CUSTOMER, EMPTY_PROFILE } from "./lib/constants";
 import {
   dedupeCustomers,
   loadAdminCustomerDirectory,
+  loadStaffCustomerDirectory,
   normalizeHistory,
   normalizeProfile,
   normalizeVehicleSearchTerm,
@@ -25,7 +25,6 @@ export function StaffCustomersPageContent() {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
-  const searchInputRef = useRef<HTMLInputElement>(null);
   const searchGenerationRef = useRef(0);
   const detailsRequestIdRef = useRef(0);
   const isAdminView = pathname?.startsWith("/admin");
@@ -39,7 +38,6 @@ export function StaffCustomersPageContent() {
       ? rawQueryParam
       : "";
   const textQueryFromUrl = isUuid(rawQueryParam) ? "" : rawQueryParam;
-  const searchInputDefault = customerIdFromUrl || textQueryFromUrl;
 
   const [directory, setDirectory] = useState<SearchCustomer[]>([]);
   const [selectedCustomerId, setSelectedCustomerId] = useState("");
@@ -50,7 +48,6 @@ export function StaffCustomersPageContent() {
   const [historyPage, setHistoryPage] = useState(1);
   const [searchError, setSearchError] = useState<string | null>(null);
   const [detailError, setDetailError] = useState<string | null>(null);
-  const [isSearching, setIsSearching] = useState(false);
   const [isLoadingHistory, setIsLoadingHistory] = useState(false);
   const [detailModalOpen, setDetailModalOpen] = useState(false);
   const [adminListLoading, setAdminListLoading] = useState(false);
@@ -69,6 +66,7 @@ export function StaffCustomersPageContent() {
         customer.fullName.toLowerCase().includes(term) ||
         customer.email.toLowerCase().includes(term) ||
         customer.phone.includes(term) ||
+        customer.vehicleNumber.toLowerCase().includes(term) ||
         customer.id.toLowerCase().includes(term),
     );
   }, [adminTableSearch, directory]);
@@ -88,6 +86,34 @@ export function StaffCustomersPageContent() {
     }
   };
 
+  const loadStaffCustomerList = async () => {
+    setAdminListLoading(true);
+    setSearchError(null);
+    try {
+      const listResult = await loadStaffCustomerDirectory();
+      setDirectory(listResult.customers);
+      setSearchError(listResult.error);
+    } catch {
+      setDirectory([]);
+      setSearchError("Could not load the customer list.");
+    } finally {
+      setAdminListLoading(false);
+    }
+  };
+
+  const refreshCustomerList = () => {
+    if (isAdminView) {
+      void loadAdminCustomerList();
+      return;
+    }
+    setAdminTableSearch("");
+    if (customerIdFromUrl || textQueryFromUrl) {
+      router.push(directoryBasePath);
+      return;
+    }
+    void loadStaffCustomerList();
+  };
+
   useEffect(() => {
     if (!isAdminView) return;
     void loadAdminCustomerList();
@@ -99,7 +125,7 @@ export function StaffCustomersPageContent() {
     const performSearch = async () => {
       const searchGeneration = ++searchGenerationRef.current;
 
-      setIsSearching(true);
+      setAdminListLoading(true);
       setSearchError(null);
       setDetailError(null);
       setDirectory([]);
@@ -122,14 +148,18 @@ export function StaffCustomersPageContent() {
         }
 
         if (!customerIdFromUrl && !textQueryFromUrl) {
-          setDirectory([]);
+          const listResult = await loadStaffCustomerDirectory();
+          if (searchGeneration !== searchGenerationRef.current) return;
+
+          setDirectory(listResult.customers);
           setSelectedCustomerId("");
           setProfile(EMPTY_PROFILE);
           setVehicles([]);
           setHistory([]);
           setFilterMode("all");
           setHistoryPage(1);
-          setSearchError(null);
+          setDetailModalOpen(false);
+          setSearchError(listResult.error);
           return;
         }
 
@@ -202,12 +232,17 @@ export function StaffCustomersPageContent() {
         setHistoryPage(1);
         setSearchError("The customer search request could not reach the backend.");
       } finally {
-        setIsSearching(false);
+        setAdminListLoading(false);
       }
     };
 
     void performSearch();
   }, [customerIdFromUrl, textQueryFromUrl, hasInvalidCustomerIdParam, isAdminView]);
+
+  useEffect(() => {
+    if (isAdminView || !textQueryFromUrl) return;
+    setAdminTableSearch(textQueryFromUrl);
+  }, [isAdminView, textQueryFromUrl]);
 
   useEffect(() => {
     const customerId = selectedCustomerId;
@@ -382,47 +417,21 @@ export function StaffCustomersPageContent() {
     URL.revokeObjectURL(url);
   };
 
-  const handleSearchSubmit = (event: React.FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    const query = searchInputRef.current?.value.trim() ?? "";
-    if (!query) {
-      router.push(directoryBasePath);
-      return;
-    }
-    if (isUuid(query)) {
-      router.push(`${directoryBasePath}?customerId=${encodeURIComponent(query)}`);
-      return;
-    }
-    router.push(`${directoryBasePath}?q=${encodeURIComponent(query)}`);
-  };
-
   return (
-    <section className={isAdminView ? "admin-page customer-directory-page" : "customer-directory-page"}>
-      {isAdminView ? (
-        <AdminCustomersView
-          adminListLoading={adminListLoading}
-          directoryCount={directory.length}
-          searchError={searchError}
-          adminTableSearch={adminTableSearch}
-          onAdminTableSearchChange={setAdminTableSearch}
-          adminFilteredCustomers={adminFilteredCustomers}
-          selectedCustomerId={selectedCustomerId}
-          detailModalOpen={detailModalOpen}
-          onRefresh={() => void loadAdminCustomerList()}
-          onOpenCustomer={openCustomerModal}
-        />
-      ) : (
-        <StaffDirectoryView
-          searchInputRef={searchInputRef}
-          searchInputDefault={searchInputDefault}
-          isSearching={isSearching}
-          directory={directory}
-          selectedCustomerId={selectedCustomerId}
-          detailModalOpen={detailModalOpen}
-          onSearchSubmit={handleSearchSubmit}
-          onOpenCustomer={openCustomerModal}
-        />
-      )}
+    <section className="admin-page customer-directory-page">
+      <AdminCustomersView
+        variant={isAdminView ? "admin" : "staff"}
+        adminListLoading={adminListLoading}
+        directoryCount={directory.length}
+        searchError={searchError}
+        adminTableSearch={adminTableSearch}
+        onAdminTableSearchChange={setAdminTableSearch}
+        adminFilteredCustomers={adminFilteredCustomers}
+        selectedCustomerId={selectedCustomerId}
+        detailModalOpen={detailModalOpen}
+        onRefresh={refreshCustomerList}
+        onOpenCustomer={openCustomerModal}
+      />
 
       {detailModalOpen && selectedCustomerId ? (
         <CustomerDetailModal

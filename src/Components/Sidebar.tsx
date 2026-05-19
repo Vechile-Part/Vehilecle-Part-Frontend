@@ -20,6 +20,7 @@ import {
   MdSearch,
   MdHistory,
   MdAssignment,
+  MdInfoOutline,
 } from "react-icons/md";
 import { FaUserFriends } from "react-icons/fa";
 import AdminNotificationBell from "./AdminNotificationBell";
@@ -40,9 +41,9 @@ function roleHomeHref(role: ShellRole | null): string {
     case "admin":
       return "/admin/dashboard";
     case "staff":
-      return "/staff/customers";
+      return "/staff/dashboard";
     case "customer":
-      return "/customer/profile";
+      return "/customer/dashboard";
     default:
       return "/auth/login";
   }
@@ -100,6 +101,20 @@ const MAIN_NAV: NavItem[] = [
     Icon: MdReceiptLong,
   },
   {
+    href: "/staff/appointments",
+    label: "Appointments",
+    match: ["/staff/appointments"],
+    roles: ["admin", "staff"],
+    Icon: MdCalendarToday,
+  },
+  {
+    href: "/staff/dashboard",
+    label: "Dashboard",
+    match: ["/staff/dashboard"],
+    roles: ["staff"],
+    Icon: MdBarChart,
+  },
+  {
     href: "/staff/customers",
     label: "Customers",
     match: ["/staff/customers"],
@@ -140,6 +155,20 @@ const MAIN_NAV: NavItem[] = [
     match: ["/admin/part-requests"],
     roles: ["admin"],
     Icon: MdAssignment,
+  },
+  {
+    href: "/customer/dashboard",
+    label: "Dashboard",
+    match: ["/customer/dashboard"],
+    roles: ["customer"],
+    Icon: MdBarChart,
+  },
+  {
+    href: "/customer/about",
+    label: "Service center",
+    match: ["/customer/about"],
+    roles: ["customer"],
+    Icon: MdInfoOutline,
   },
   {
     href: "/customer/profile",
@@ -196,7 +225,12 @@ function Sidebar() {
     return MAIN_NAV.filter((item) => item.roles.includes(shellRole));
   }, [shellRole]);
 
-  const accountHref = shellRole === "customer" ? "/customer/profile" : "/settings";
+  const accountHref =
+    shellRole === "customer"
+      ? "/customer/profile"
+      : shellRole === "staff"
+        ? "/staff/profile"
+        : "/settings";
 
   const badge = useMemo(() => {
     if (shellRole === "customer") {
@@ -290,8 +324,12 @@ function Sidebar() {
       <div className="sidebar-toolbar" aria-label="Account shortcuts">
         {shellRole === "admin" ? (
           <AdminNotificationBell />
+        ) : shellRole === "staff" ? (
+          <Link href="/staff/appointments" className="sidebar-icon-btn" aria-label="Appointments">
+            <MdNotificationsNone size={20} />
+          </Link>
         ) : (
-          <button type="button" className="sidebar-icon-btn" aria-label="Notifications">
+          <button type="button" className="sidebar-icon-btn" aria-label="Notifications" disabled>
             <MdNotificationsNone size={20} />
           </button>
         )}
@@ -326,7 +364,7 @@ function Sidebar() {
             New Sale
           </Link>
         )}
-        <Link href="/help" className="sidebar-item">
+        <Link href="/help" className={`sidebar-item${pathname === "/help" ? " active" : ""}`}>
           <MdHelp size={18} /> Help Center
         </Link>
         <Link href="/logout" className="sidebar-item sidebar-logout">
