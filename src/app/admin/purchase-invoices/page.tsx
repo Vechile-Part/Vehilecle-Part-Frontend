@@ -2,6 +2,9 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { FiLoader, FiPlus, FiTrash2 } from "react-icons/fi";
+import PurchaseInvoiceDocument, {
+  type PurchaseInvoiceDocumentData,
+} from "@/Components/purchase/PurchaseInvoiceDocument";
 import { apiFetch, extractApiError, parseJsonSafe } from "@/lib/http";
 import { formatNpr } from "@/lib/currency";
 import "@/styles/pages/purchase-invoice.css";
@@ -26,6 +29,7 @@ type PurchaseItemRecord = {
 
 type PurchaseInvoiceRecord = {
   id: string;
+  invoiceNumber: string;
   vendorId: string;
   vendorName: string;
   vendorContactPerson: string;
@@ -64,6 +68,7 @@ export default function AdminPurchaseInvoicesPage() {
   const [loadingRecent, setLoadingRecent] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [status, setStatus] = useState<{ tone: "success" | "error"; text: string } | null>(null);
+  const [selectedId, setSelectedId] = useState("");
 
   const partById = useMemo(() => {
     const map = new Map<string, PartOption>();
@@ -105,8 +110,11 @@ export default function AdminPurchaseInvoicesPage() {
       ? itemsRaw.map((item) => normalizePurchaseItem(item as Record<string, unknown>))
       : [];
 
+    const invoiceNumber = readStr(raw, "invoiceNumber", "InvoiceNumber");
+
     return {
       id,
+      invoiceNumber: invoiceNumber || id.slice(0, 8).toUpperCase(),
       vendorId,
       vendorName: readStr(raw, "vendorName", "VendorName") || vendor?.name || "Vendor",
       vendorContactPerson: readStr(raw, "vendorContactPerson", "VendorContactPerson"),
@@ -147,8 +155,11 @@ export default function AdminPurchaseInvoicesPage() {
           })
         : [];
 
+      const invoiceNumber = readStr(raw, "invoiceNumber", "InvoiceNumber");
+
       return {
         id,
+        invoiceNumber: invoiceNumber || id.slice(0, 8).toUpperCase(),
         vendorId: vid,
         vendorName: readStr(raw, "vendorName", "VendorName") || vendor?.name || "Vendor",
         vendorContactPerson: readStr(raw, "vendorContactPerson", "VendorContactPerson"),
@@ -290,10 +301,13 @@ export default function AdminPurchaseInvoicesPage() {
           return `${part?.name ?? "Part"}: ${before} → ${before + item.quantity}`;
         })
         .join(" · ");
+      const createdId = readStr((data ?? {}) as Record<string, unknown>, "id", "Id");
+      const createdNumber = readStr((data ?? {}) as Record<string, unknown>, "invoiceNumber", "InvoiceNumber");
       setStatus({
         tone: "success",
-        text: `Purchase saved. Stock updated — ${stockSummary}`,
+        text: `Invoice ${createdNumber || "saved"} created. Stock updated — ${stockSummary}. You can print or download it on the right.`,
       });
+      if (createdId) setSelectedId(createdId);
       setVendorId("");
       setLines([{ rowId: rowId(), partId: "", quantity: 1, unitPrice: 0 }]);
       await loadAll();
@@ -322,12 +336,42 @@ export default function AdminPurchaseInvoicesPage() {
     [recentPurchases],
   );
 
+  const toDocument = (purchase: PurchaseInvoiceRecord): PurchaseInvoiceDocumentData => ({
+    id: purchase.id,
+    invoiceNumber: purchase.invoiceNumber,
+    vendorName: purchase.vendorName,
+    vendorContactPerson: purchase.vendorContactPerson,
+    vendorPhone: purchase.vendorPhone,
+    vendorEmail: purchase.vendorEmail,
+    issuedAtUtc: purchase.issuedAtUtc,
+    totalAmount: purchase.totalAmount,
+    items: purchase.items.map((item) => ({
+      partName: item.partName,
+      partNumber: item.partNumber,
+      quantity: item.quantity,
+      unitPrice: item.unitPrice,
+    })),
+  });
+
+  const selectedPurchase = useMemo(
+    () => sortedPurchases.find((p) => p.id === selectedId) ?? sortedPurchases[0] ?? null,
+    [selectedId, sortedPurchases],
+  );
+
+  useEffect(() => {
+    if (!selectedId && sortedPurchases.length > 0) {
+      setSelectedId(sortedPurchases[0].id);
+    }
+  }, [selectedId, sortedPurchases]);
+
   return (
     <main className="layout-main admin-page purchase-invoice-page">
       <header className="admin-page-header">
         <div className="admin-page-header-text">
           <h1 className="admin-page-title">Purchase invoices</h1>
-          <p className="admin-page-subtitle">Record stock received from vendors. Total is the sum of line items (no tax or shipping).</p>
+          <p className="admin-page-subtitle">
+            Record stock from vendors. Each purchase generates a numbered invoice you can print, save as PDF, or download.
+          </p>
         </div>
         <div className="admin-page-actions">
           <button type="button" className="form-button secondary" onClick={() => void loadAll()} disabled={loading}>
@@ -338,6 +382,8 @@ export default function AdminPurchaseInvoicesPage() {
 
       {status && <div className={`purchase-invoice-status ${status.tone}`}>{status.text}</div>}
 
+      <div className="purchase-invoice-layout">
+        <div>
       <section className="form-card" style={{ maxWidth: "none" }}>
         <h2 style={{ marginTop: 0, fontSize: "1.1rem" }}>New purchase</h2>
 
@@ -423,6 +469,7 @@ export default function AdminPurchaseInvoicesPage() {
           <table className="purchase-recent-table">
             <thead>
               <tr>
+                <th>Invoice</th>
                 <th>Date</th>
                 <th>Vendor</th>
                 <th>Parts</th>
@@ -432,13 +479,13 @@ export default function AdminPurchaseInvoicesPage() {
             <tbody>
               {loadingRecent ? (
                 <tr>
-                  <td colSpan={4} className="purchase-recent-empty">
+                  <td colSpan={5} className="purchase-recent-empty">
                     Loading…
                   </td>
                 </tr>
               ) : sortedPurchases.length === 0 ? (
                 <tr>
-                  <td colSpan={4} className="purchase-recent-empty">
+                  <td colSpan={5} className="purchase-recent-empty">
                     No purchases yet.
                   </td>
                 </tr>
@@ -446,7 +493,17 @@ export default function AdminPurchaseInvoicesPage() {
                 sortedPurchases.map((purchase) => {
                   const when = formatPurchaseWhen(purchase.issuedAtUtc);
                   return (
-                    <tr key={purchase.id}>
+                    <tr key={purchase.id} className={selectedId === purchase.id ? "purchase-recent-row-selected" : ""}>
+                      <td data-label="Invoice">
+                        <span className="purchase-recent-invoice-ref">{purchase.invoiceNumber}</span>
+                        <button
+                          type="button"
+                          className="purchase-recent-view-btn"
+                          onClick={() => setSelectedId(purchase.id)}
+                        >
+                          View invoice
+                        </button>
+                      </td>
                       <td data-label="Date" className="purchase-recent-date">
                         <span className="purchase-recent-date-main">{when.date}</span>
                         {when.time ? <span className="purchase-recent-date-sub">{when.time}</span> : null}
@@ -485,6 +542,18 @@ export default function AdminPurchaseInvoicesPage() {
           </table>
         </div>
       </section>
+        </div>
+
+        {selectedPurchase ? (
+          <PurchaseInvoiceDocument invoice={toDocument(selectedPurchase)} />
+        ) : (
+          <article className="purchase-invoice-document">
+            <p className="purchase-recent-muted" style={{ margin: 0 }}>
+              Save a purchase or select one from the list to view and print the generated invoice.
+            </p>
+          </article>
+        )}
+      </div>
     </main>
   );
 }

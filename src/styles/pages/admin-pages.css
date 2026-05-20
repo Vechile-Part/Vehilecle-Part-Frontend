@@ -118,6 +118,20 @@
   gap: 12px;
 }
 
+.admin-role-update-form {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  width: 100%;
+}
+
+.admin-role-update-form .form-input,
+.admin-role-update-form .form-button {
+  width: 100%;
+  max-width: none;
+  box-sizing: border-box;
+}
+
 @media (max-width: 900px) {
   .layout-main {
     padding: 20px 16px;

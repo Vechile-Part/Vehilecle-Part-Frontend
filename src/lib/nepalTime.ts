@@ -105,3 +105,23 @@ export function formatNepalDateTime(iso: string): string {
     timeStyle: "short",
   });
 }
+
+export function formatNepalTimeOnly(iso: string): string {
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return iso;
+
+  return date.toLocaleString("en-NP", {
+    timeZone: NEPAL_TIME_ZONE,
+    timeStyle: "short",
+  });
+}
+
+export function isNepalDateToday(iso: string, reference: Date = new Date()): boolean {
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return false;
+  const parts = getNepalDateParts(date);
+  const today = getNepalDateParts(reference);
+  return (
+    parts.year === today.year && parts.month === today.month && parts.day === today.day
+  );
+}

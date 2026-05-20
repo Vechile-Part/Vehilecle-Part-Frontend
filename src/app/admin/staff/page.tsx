@@ -370,7 +370,7 @@ export default function AdminStaffPage() {
         }}
       >
         <h2 style={{ fontSize: "24px", color: "#3d2817", marginBottom: "24px", marginTop: 0 }}>Quick Role Update</h2>
-        <div style={{ display: "flex", flexDirection: "column", gap: "20px", maxWidth: "480px" }}>
+        <div className="admin-role-update-form">
           <select
             className="form-input"
             value={roleForm.userId}

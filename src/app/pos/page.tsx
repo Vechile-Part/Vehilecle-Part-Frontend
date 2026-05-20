@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { FiLoader, FiPlusCircle, FiSearch, FiShoppingCart, FiTrash2, FiUser } from "react-icons/fi";
+import { FiLoader, FiPlus, FiSearch, FiTrash2 } from "react-icons/fi";
 import { formatNpr } from "@/lib/currency";
 import { extractApiError, isUuid, parseJsonSafe, apiFetch } from "@/lib/http";
 import { getShellRoleFromToken } from "@/lib/jwtRole";
@@ -68,9 +68,9 @@ const normalizeCustomerHit = (record: Record<string, unknown>): CustomerOption |
 };
 
 function stockBadge(part: SalePart) {
-  if (part.quantityInStock <= 0) return { label: "Out of stock", className: "out" };
-  if (part.isLowStock || part.quantityInStock < 10) return { label: "Low stock", className: "low" };
-  return { label: "In stock", className: "ok" };
+  if (part.quantityInStock <= 0) return { label: "Out", className: "out" };
+  if (part.isLowStock || part.quantityInStock < 10) return { label: "Low", className: "low" };
+  return { label: "OK", className: "ok" };
 }
 
 export default function SalesPosPage() {
@@ -143,6 +143,7 @@ export default function SalesPosPage() {
   const estimatedTotal = Math.max(0, subtotal - appliedDiscountPreview);
   const balanceDue = Math.max(0, estimatedTotal - paidAmount);
   const changeDue = Math.max(0, paidAmount - estimatedTotal);
+  const cartCount = cart.reduce((n, line) => n + line.quantity, 0);
 
   const addToCart = (part: SalePart) => {
     if (part.quantityInStock <= 0) {
@@ -239,7 +240,7 @@ export default function SalesPosPage() {
 
   const submitSale = async () => {
     if (!isUuid(customerId)) {
-      setStatus({ tone: "error", text: "Select or enter a valid customer before completing the sale." });
+      setStatus({ tone: "error", text: "Select or search for a valid customer before completing the sale." });
       return;
     }
     if (cart.length === 0) {
@@ -338,144 +339,124 @@ export default function SalesPosPage() {
     }
   };
 
-  const cartCount = cart.reduce((n, line) => n + line.quantity, 0);
-
   return (
-    <section className="sales-pos-page">
-      <header className="sales-pos-header-band">
-        <div className="sales-pos-header-main">
-          <p className="sales-pos-kicker">Sales &amp; POS</p>
-          <h1>Point of sale</h1>
-          <p className="sales-pos-lead">
-            Add parts, attach a customer, and complete the sale. Purchases over {formatNpr(LOYALTY_THRESHOLD)} qualify
-            for loyalty discount.
+    <section className="sales-pos-page layout-main">
+      <header className="sales-pos-header">
+        <div>
+          <h1>Sales &amp; POS</h1>
+          <p className="sales-pos-subtitle">
+            Select parts, attach a customer, and complete payment. Loyalty: 10% off when subtotal exceeds{" "}
+            {formatNpr(LOYALTY_THRESHOLD)}.
           </p>
-          <div className="sales-pos-steps" aria-label="Checkout steps">
-            <span className="sales-pos-step">
-              <span className="sales-pos-step-num">1</span> Catalogue
-            </span>
-            <span className="sales-pos-step">
-              <span className="sales-pos-step-num">2</span> Customer
-            </span>
-            <span className="sales-pos-step">
-              <span className="sales-pos-step-num">3</span> Pay
-            </span>
-          </div>
         </div>
-        <div className="sales-pos-total-highlight" aria-live="polite">
-          <span>Total due</span>
-          <strong>{formatNpr(estimatedTotal)}</strong>
+        <div className="sales-pos-header-totals" aria-live="polite">
+          <div className="sales-pos-header-stat">
+            <span>Cart</span>
+            <strong>{cartCount}</strong>
+          </div>
+          <div className="sales-pos-header-stat sales-pos-header-stat--due">
+            <span>Total due</span>
+            <strong>{formatNpr(estimatedTotal)}</strong>
+          </div>
         </div>
       </header>
 
-      <div className="sales-pos-stats">
-        <span className="sales-pos-stat-pill">
-          <FiShoppingCart aria-hidden /> Cart: <strong>{cartCount}</strong> item{cartCount === 1 ? "" : "s"}
-        </span>
-        <span className="sales-pos-stat-pill">
-          Subtotal: <strong>{formatNpr(subtotal)}</strong>
-        </span>
-        <span className="sales-pos-stat-pill">
-          Parts: <strong>{partsLoading ? "…" : parts.length}</strong>
-        </span>
-        {loyaltyDiscount > 0 && (
-          <span className="sales-pos-stat-pill">
-            Loyalty min.: <strong>{formatNpr(loyaltyDiscount)}</strong>
-          </span>
-        )}
-      </div>
+      {status ? <div className={`sales-pos-alert sales-pos-alert--${status.tone}`}>{status.text}</div> : null}
 
-      {status && <div className={`sales-pos-status ${status.tone}`}>{status.text}</div>}
-
-      <div className="sales-pos-grid">
-        <div className="sales-pos-card">
-          <div className="sales-pos-card-head">
-            <p className="sales-pos-section-title">Inventory</p>
+      <div className="sales-pos-layout">
+        <div className="sales-pos-block">
+          <div className="sales-pos-block-head">
             <h2>Parts catalogue</h2>
-          </div>
-          <div className="sales-pos-card-body">
-          <div className="sales-pos-parts-toolbar">
-            <input
-              className="sales-pos-search-input"
-              placeholder="Search by name or part number…"
-              value={partsFilter}
-              onChange={(event) => setPartsFilter(event.target.value)}
-            />
-            <button
-              type="button"
-              className="sales-pos-btn-secondary-link"
-              style={{ minWidth: 100 }}
-              onClick={() => void loadParts()}
-              disabled={partsLoading}
-            >
-              {partsLoading ? <FiLoader size={18} /> : "Refresh"}
-            </button>
+            <div className="sales-pos-toolbar">
+              <input
+                className="sales-pos-input"
+                type="search"
+                placeholder="Search name or part number…"
+                value={partsFilter}
+                onChange={(event) => setPartsFilter(event.target.value)}
+                aria-label="Search parts"
+              />
+              <button
+                type="button"
+                className="sales-pos-btn sales-pos-btn--outline"
+                onClick={() => void loadParts()}
+                disabled={partsLoading}
+              >
+                {partsLoading ? <FiLoader size={16} className="sales-pos-spin" /> : "Refresh"}
+              </button>
+            </div>
           </div>
 
-          <div className="sales-pos-parts-list">
-            {!partsLoading && filteredParts.length > 0 && (
-              <div className="sales-pos-parts-list-head" aria-hidden>
-                <span>Part</span>
-                <span>Price</span>
-                <span>Qty</span>
-                <span />
-              </div>
-            )}
-            {partsLoading ? (
-              <p className="sales-pos-empty">Loading parts…</p>
-            ) : filteredParts.length === 0 ? (
-              <p className="sales-pos-empty">No parts match your search.</p>
-            ) : (
-              filteredParts.map((part) => {
-                const badge = stockBadge(part);
-                const out = part.quantityInStock <= 0;
-                return (
-                  <article
-                    key={part.id}
-                    className={`sales-pos-part-row ${part.isLowStock || part.quantityInStock < 10 ? "low-stock" : ""} ${out ? "out-of-stock" : ""}`}
-                  >
-                    <div className="sales-pos-part-meta">
-                      <strong>{part.name}</strong>
-                      <span className="sales-pos-part-sku">{part.partNumber || "No SKU"}</span>
-                      <span className={`sales-pos-stock-badge ${badge.className}`}>{badge.label}</span>
-                    </div>
-                    <span className="sales-pos-part-price-col">{formatNpr(part.unitPrice)}</span>
-                    <span className="sales-pos-part-qty-col">{part.quantityInStock}</span>
-                    <button
-                      type="button"
-                      className="sales-pos-add-btn"
-                      onClick={() => addToCart(part)}
-                      disabled={out}
-                    >
-                      <FiPlusCircle size={16} aria-hidden /> Add
-                    </button>
-                  </article>
-                );
-              })
-            )}
-          </div>
+          <div className="sales-pos-table-wrap">
+            <table className="sales-pos-table">
+              <thead>
+                <tr>
+                  <th>Part</th>
+                  <th>Price</th>
+                  <th>Stock</th>
+                  <th aria-label="Actions" />
+                </tr>
+              </thead>
+              <tbody>
+                {partsLoading ? (
+                  <tr>
+                    <td colSpan={4} className="sales-pos-table-empty">
+                      Loading parts…
+                    </td>
+                  </tr>
+                ) : filteredParts.length === 0 ? (
+                  <tr>
+                    <td colSpan={4} className="sales-pos-table-empty">
+                      No parts match your search.
+                    </td>
+                  </tr>
+                ) : (
+                  filteredParts.map((part) => {
+                    const badge = stockBadge(part);
+                    const out = part.quantityInStock <= 0;
+                    return (
+                      <tr key={part.id} className={out ? "sales-pos-row--disabled" : undefined}>
+                        <td>
+                          <span className="sales-pos-part-name">{part.name}</span>
+                          <span className="sales-pos-part-sku">{part.partNumber || "—"}</span>
+                          <span className={`sales-pos-badge sales-pos-badge--${badge.className}`}>
+                            {badge.label}
+                          </span>
+                        </td>
+                        <td>{formatNpr(part.unitPrice)}</td>
+                        <td>{part.quantityInStock}</td>
+                        <td className="sales-pos-table-action">
+                          <button
+                            type="button"
+                            className="sales-pos-btn sales-pos-btn--small"
+                            onClick={() => addToCart(part)}
+                            disabled={out}
+                          >
+                            <FiPlus size={14} aria-hidden /> Add
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })
+                )}
+              </tbody>
+            </table>
           </div>
         </div>
 
-        <div className="sales-pos-card sales-pos-card--checkout">
-          <div className="sales-pos-card-head">
-            <p className="sales-pos-section-title">Checkout</p>
-            <h2>Customer &amp; payment</h2>
-          </div>
-          <div className="sales-pos-card-body">
-          <div className="sales-pos-panel">
-            <p className="sales-pos-panel-title">
-              <FiUser size={14} aria-hidden /> Customer
-            </p>
-          <div className="sales-pos-customer-pick">
-            <label className="sales-pos-field">
-              <span>Search by name, phone, vehicle, or ID</span>
-              <div className="sales-pos-search-row">
+        <aside className="sales-pos-block sales-pos-block--checkout">
+          <h2>Checkout</h2>
+
+          <div className="sales-pos-section">
+            <h3>Customer</h3>
+            <label className="sales-pos-label">
+              Search (name, phone, vehicle, or ID)
+              <div className="sales-pos-input-row">
                 <input
-                  className="sales-pos-field-input"
+                  className="sales-pos-input"
                   value={customerQuery}
                   onChange={(event) => setCustomerQuery(event.target.value)}
-                  placeholder="Name, phone, vehicle, or ID"
+                  placeholder="Type to search…"
                   onKeyDown={(event) => {
                     if (event.key === "Enter") {
                       event.preventDefault();
@@ -485,25 +466,24 @@ export default function SalesPosPage() {
                 />
                 <button
                   type="button"
-                  className="sales-pos-search-btn"
+                  className="sales-pos-btn sales-pos-btn--icon"
                   onClick={() => void searchCustomers()}
                   disabled={isSearchingCustomer}
                   aria-label="Search customers"
                 >
-                  {isSearchingCustomer ? <FiLoader size={18} /> : <FiSearch size={18} />}
+                  {isSearchingCustomer ? <FiLoader size={18} className="sales-pos-spin" /> : <FiSearch size={18} />}
                 </button>
               </div>
             </label>
-
-            {customerOptions.length > 0 && (
-              <label className="sales-pos-field">
-                <span>Select from results</span>
+            {customerOptions.length > 0 ? (
+              <label className="sales-pos-label">
+                Select customer
                 <select
-                  className="sales-pos-field-input"
+                  className="sales-pos-input"
                   value={customerId}
                   onChange={(event) => setCustomerId(event.target.value)}
                 >
-                  <option value="">Select customer</option>
+                  <option value="">Choose customer…</option>
                   {customerOptions.map((option) => (
                     <option key={option.id} value={option.id}>
                       {option.label}
@@ -511,199 +491,180 @@ export default function SalesPosPage() {
                   ))}
                 </select>
               </label>
-            )}
-
-          </div>
+            ) : null}
           </div>
 
-          <div className="sales-pos-panel">
-            <p className="sales-pos-panel-title">
-              <FiShoppingCart size={14} aria-hidden /> Cart
-            </p>
-          <div className="sales-pos-cart-block">
+          <div className="sales-pos-section">
+            <h3>
+              Cart <span className="sales-pos-muted">({cartCount} items)</span>
+            </h3>
             {cart.length === 0 ? (
-              <p className="sales-pos-empty">No parts in the cart yet. Add items from the catalogue.</p>
+              <p className="sales-pos-hint">No items yet. Add parts from the catalogue.</p>
             ) : (
-              <>
-                <div className="sales-pos-cart-head" aria-hidden>
-                  <span>Item</span>
-                  <span>Qty</span>
-                  <span>Line total</span>
-                  <span />
-                </div>
-                <div className="sales-pos-cart-lines">
-                  {cart.map((line) => (
-                    <div key={line.rowId} className="sales-pos-cart-line">
-                      <div className="sales-pos-cart-line-name">
-                        <strong>{line.name}</strong>
-                        <span>{formatNpr(line.unitPrice)} each</span>
-                      </div>
-                      <input
-                        className="sales-pos-qty-input"
-                        type="number"
-                        min={1}
-                        value={line.quantity}
-                        onChange={(event) => updateLineQuantity(line.rowId, Number(event.target.value))}
-                        aria-label={`Quantity for ${line.name}`}
-                      />
-                      <div className="sales-pos-cart-line-total">{formatNpr(line.unitPrice * line.quantity)}</div>
-                      <button
-                        type="button"
-                        className="sales-pos-icon-btn"
-                        onClick={() => removeLine(line.rowId)}
-                        aria-label={`Remove ${line.name}`}
-                      >
-                        <FiTrash2 size={16} />
-                      </button>
+              <ul className="sales-pos-cart-list">
+                {cart.map((line) => (
+                  <li key={line.rowId} className="sales-pos-cart-item">
+                    <div className="sales-pos-cart-item-info">
+                      <strong>{line.name}</strong>
+                      <span>{formatNpr(line.unitPrice)} each</span>
                     </div>
-                  ))}
-                </div>
-              </>
+                    <input
+                      className="sales-pos-input sales-pos-input--qty"
+                      type="number"
+                      min={1}
+                      value={line.quantity}
+                      onChange={(event) => updateLineQuantity(line.rowId, Number(event.target.value))}
+                      aria-label={`Quantity for ${line.name}`}
+                    />
+                    <span className="sales-pos-cart-line-total">{formatNpr(line.unitPrice * line.quantity)}</span>
+                    <button
+                      type="button"
+                      className="sales-pos-btn sales-pos-btn--icon sales-pos-btn--danger"
+                      onClick={() => removeLine(line.rowId)}
+                      aria-label={`Remove ${line.name}`}
+                    >
+                      <FiTrash2 size={16} />
+                    </button>
+                  </li>
+                ))}
+              </ul>
             )}
           </div>
-          </div>
 
-          {loyaltyDiscount > 0 && discountAmount < loyaltyDiscount && (
-            <p className="sales-pos-loyalty-hint">
-              Loyalty: subtotal over {formatNpr(LOYALTY_THRESHOLD)} — at least {formatNpr(loyaltyDiscount)} discount applies
-              on complete sale.
+          {loyaltyDiscount > 0 && discountAmount < loyaltyDiscount ? (
+            <p className="sales-pos-loyalty">
+              Loyalty discount available: {formatNpr(loyaltyDiscount)} (10% on subtotal over {formatNpr(LOYALTY_THRESHOLD)}).{" "}
               <button type="button" onClick={() => setDiscountAmount(loyaltyDiscount)}>
-                Apply {formatNpr(loyaltyDiscount)} to discount field
+                Apply to discount
               </button>
             </p>
-          )}
+          ) : null}
 
-          <div className="sales-pos-panel">
-            <p className="sales-pos-panel-title">Payment</p>
-          <div className="sales-pos-payment-grid">
-            <label className="sales-pos-field">
-              <span>Discount (NPR)</span>
-              <input
-                className="sales-pos-field-input"
-                type="number"
-                min={0}
-                step="0.01"
-                value={discountAmount}
-                onChange={(event) => setDiscountAmount(Number(event.target.value))}
-              />
-            </label>
-            <label className="sales-pos-field">
-              <span>Paid amount (NPR)</span>
-              <input
-                className="sales-pos-field-input"
-                type="number"
-                min={0}
-                step="0.01"
-                value={paidAmount}
-                onChange={(event) => setPaidAmount(Number(event.target.value))}
-              />
-            </label>
-          </div>
-
-          <button
-            type="button"
-            className="sales-pos-btn-pay-full"
-            onClick={() => setPaidAmount(estimatedTotal)}
-            disabled={cart.length === 0}
-          >
-            Pay full amount ({formatNpr(estimatedTotal)})
-          </button>
+          <div className="sales-pos-section">
+            <h3>Payment</h3>
+            <div className="sales-pos-field-row">
+              <label className="sales-pos-label">
+                Discount (NPR)
+                <input
+                  className="sales-pos-input"
+                  type="number"
+                  min={0}
+                  step="0.01"
+                  value={discountAmount}
+                  onChange={(event) => setDiscountAmount(Number(event.target.value))}
+                />
+              </label>
+              <label className="sales-pos-label">
+                Paid (NPR)
+                <input
+                  className="sales-pos-input"
+                  type="number"
+                  min={0}
+                  step="0.01"
+                  value={paidAmount}
+                  onChange={(event) => setPaidAmount(Number(event.target.value))}
+                />
+              </label>
+            </div>
+            <button
+              type="button"
+              className="sales-pos-btn sales-pos-btn--outline sales-pos-btn--block"
+              onClick={() => setPaidAmount(estimatedTotal)}
+              disabled={cart.length === 0}
+            >
+              Pay full amount ({formatNpr(estimatedTotal)})
+            </button>
           </div>
 
           <div className="sales-pos-summary">
             <div className="sales-pos-summary-row">
               <span>Subtotal</span>
-              <strong>{formatNpr(subtotal)}</strong>
+              <span>{formatNpr(subtotal)}</span>
             </div>
-            {appliedDiscountPreview > 0 && (
-              <div className="sales-pos-summary-row discount">
-                <span>Discount (estimate)</span>
-                <strong>−{formatNpr(appliedDiscountPreview)}</strong>
+            {appliedDiscountPreview > 0 ? (
+              <div className="sales-pos-summary-row">
+                <span>Discount</span>
+                <span>−{formatNpr(appliedDiscountPreview)}</span>
               </div>
-            )}
-            <div className="sales-pos-total-due-bar">
+            ) : null}
+            <div className="sales-pos-summary-row sales-pos-summary-row--total">
               <span>Total due</span>
               <strong>{formatNpr(estimatedTotal)}</strong>
             </div>
-            {paidAmount > 0 && (
+            {paidAmount > 0 ? (
               <>
                 <div className="sales-pos-summary-row">
                   <span>Balance due</span>
-                  <strong>{formatNpr(balanceDue)}</strong>
+                  <span>{formatNpr(balanceDue)}</span>
                 </div>
-                {changeDue > 0 && (
+                {changeDue > 0 ? (
                   <div className="sales-pos-summary-row">
                     <span>Change</span>
-                    <strong>{formatNpr(changeDue)}</strong>
+                    <span>{formatNpr(changeDue)}</span>
                   </div>
-                )}
+                ) : null}
               </>
-            )}
+            ) : null}
           </div>
 
-          <div className="sales-pos-actions">
+          <div className="sales-pos-checkout-actions">
             <button
               type="button"
-              className="sales-pos-btn-primary"
+              className="sales-pos-btn sales-pos-btn--primary sales-pos-btn--block"
               onClick={() => void submitSale()}
               disabled={isSubmitting || cart.length === 0}
             >
               {isSubmitting ? "Processing…" : "Complete sale"}
             </button>
-            <Link href="/staff/customers" className="sales-pos-btn-secondary-link">
+            <Link href="/staff/customers" className="sales-pos-btn sales-pos-btn--outline sales-pos-btn--block">
               Customer directory
             </Link>
           </div>
 
-          {createdInvoice && (
+          {createdInvoice ? (
             <div className="sales-pos-receipt">
               <h3>Sale complete · {createdInvoice.invoiceNumber}</h3>
-              <div className="sales-pos-summary">
-                <div className="sales-pos-summary-row">
+              <ul className="sales-pos-receipt-lines">
+                <li>
                   <span>Total</span>
                   <strong>{formatNpr(createdInvoice.totalAmount)}</strong>
-                </div>
-                <div className="sales-pos-summary-row">
-                  <span>Discount applied</span>
+                </li>
+                <li>
+                  <span>Discount</span>
                   <strong>{formatNpr(createdInvoice.discountAmount)}</strong>
-                </div>
-                <div className="sales-pos-summary-row">
+                </li>
+                <li>
                   <span>Paid</span>
                   <strong>{formatNpr(createdInvoice.paidAmount)}</strong>
-                </div>
-                <div className="sales-pos-summary-row">
+                </li>
+                <li>
                   <span>Pending credit</span>
                   <strong>{formatNpr(createdInvoice.pendingCredit)}</strong>
-                </div>
-              </div>
-              {createdInvoice.items.length > 0 && (
-                <ul className="sales-pos-receipt-list">
+                </li>
+              </ul>
+              {createdInvoice.items.length > 0 ? (
+                <ul className="sales-pos-receipt-items">
                   {createdInvoice.items.map((item) => (
                     <li key={`${item.partName}-${item.quantity}`}>
                       {item.partName} × {item.quantity} — {formatNpr(item.lineTotal)}
                     </li>
                   ))}
                 </ul>
-              )}
+              ) : null}
               <div className="sales-pos-receipt-actions">
-                <button
-                  type="button"
-                  className="sales-pos-btn-secondary-link"
-                  onClick={() => void sendInvoiceEmail()}
-                >
-                  Resend invoice email
+                <button type="button" className="sales-pos-btn sales-pos-btn--outline" onClick={() => void sendInvoiceEmail()}>
+                  Resend email
                 </button>
                 <Link
                   href={`/staff/invoices?invoiceId=${createdInvoice.id}`}
-                  className="sales-pos-btn-secondary-link"
+                  className="sales-pos-btn sales-pos-btn--outline"
                 >
-                  View invoices
+                  View invoice
                 </Link>
               </div>
             </div>
-          )}
-          </div>
-        </div>
+          ) : null}
+        </aside>
       </div>
     </section>
   );

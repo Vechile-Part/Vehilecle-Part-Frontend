@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import { FiRefreshCw, FiUsers } from "react-icons/fi";
+import CustomerReportsCharts from "@/Components/reports/CustomerReportsCharts";
 import { formatNpr } from "@/lib/currency";
 import { apiFetch, extractApiError, parseJsonSafe } from "@/lib/http";
 
@@ -233,11 +234,9 @@ export default function StaffReportsPage() {
     <>
       <header className="financial-reports-hero staff-reports-hero">
         <div className="financial-reports-hero-text">
-          <p className="admin-alerts-kicker">Staff insights</p>
           <h1 className="financial-reports-title">Customer reports</h1>
           <p className="financial-reports-subtitle">
-            Spot loyal buyers, high-value purchases, and accounts with open credit. Open a customer in the directory
-            to review full history.
+            Regular customers, high spenders, and pending credit.
           </p>
         </div>
         <div className="admin-alerts-hero-actions">
@@ -269,6 +268,14 @@ export default function StaffReportsPage() {
           </p>
         </article>
       </div>
+
+      <CustomerReportsCharts
+        regularCount={report.regularCustomers}
+        highCount={report.highSpenders}
+        creditCount={report.customersWithPendingCredits}
+        activeTab={tab}
+        activeRows={activeRows}
+      />
 
       <section className="financial-reports-table-card staff-reports-panel">
         <div className="financial-reports-table-head staff-reports-table-head">

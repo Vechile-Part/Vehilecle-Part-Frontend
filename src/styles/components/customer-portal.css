@@ -266,6 +266,61 @@
     color: #6d2f28;
 }
 
+/* Staff sidebar — compact, no inner scroll */
+.sidebar.sidebar--staff {
+    width: 260px;
+}
+
+.sidebar--staff .sidebar-product-brand {
+    padding: 14px 16px 8px;
+    font-size: 1.35rem;
+}
+
+.sidebar--staff .sidebar-badge {
+    margin: 0 8px 8px;
+    padding: 10px 12px;
+    gap: 10px;
+}
+
+.sidebar--staff .sidebar-badge-icon {
+    width: 36px;
+    height: 36px;
+    min-width: 36px;
+    min-height: 36px;
+}
+
+.sidebar--staff .sidebar-badge-name {
+    font-size: 0.88rem;
+}
+
+.sidebar--staff .sidebar-badge-sub {
+    font-size: 0.65rem;
+    margin-top: 2px;
+}
+
+.sidebar--staff .sidebar-nav-heading {
+    margin: 0 14px 4px;
+}
+
+.sidebar--staff .sidebar-nav {
+    padding: 8px 6px 12px;
+    gap: 2px;
+    overflow: visible;
+    flex: 0 1 auto;
+}
+
+.sidebar--staff .sidebar-item {
+    margin: 0 4px;
+    padding: 9px 12px;
+    font-size: 0.88rem;
+    border-radius: 8px;
+}
+
+.sidebar--staff .sidebar-item svg {
+    width: 17px;
+    height: 17px;
+}
+
 .footer.customer-portal-footer {
     min-height: 72px;
     height: auto;

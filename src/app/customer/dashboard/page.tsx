@@ -2,31 +2,112 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import RoleDashboard, { type DashboardAction, type DashboardKpi } from "@/Components/dashboard/RoleDashboard";
+import { formatNpr } from "@/lib/currency";
+import { formatNepalDateTime } from "@/lib/nepalTime";
 import { apiFetch, extractApiError, parseJsonSafe, readCustomerIdFromSession } from "@/lib/http";
 
-type CustomerSummary = {
-  fullName: string;
-  vehicleCount: number;
-  upcomingAppointments: number;
-  purchaseCount: number;
+type AppointmentRow = {
+  id: string;
+  appointmentDate: string;
+  serviceType: string;
+  status: string;
 };
 
-function countUpcomingAppointments(raw: unknown): number {
-  if (!Array.isArray(raw)) return 0;
+type VehicleRow = {
+  year: number;
+  make: string;
+  model: string;
+  vehicleNumber: string;
+};
+
+type DashboardSummary = {
+  fullName: string;
+  vehicleCount: number;
+  primaryVehicleLabel: string | null;
+  upcomingCount: number;
+  nextAppointment: AppointmentRow | null;
+  purchaseCount: number;
+  pendingCredit: number;
+};
+
+function parseAppointments(raw: unknown): AppointmentRow[] {
+  if (!Array.isArray(raw)) return [];
+  return raw
+    .map((item) => {
+      if (!item || typeof item !== "object") return null;
+      const row = item as Record<string, unknown>;
+      const id = String(row.id ?? row.Id ?? "");
+      if (!id) return null;
+      return {
+        id,
+        appointmentDate: String(row.appointmentDate ?? row.AppointmentDate ?? ""),
+        serviceType: String(row.serviceType ?? row.ServiceType ?? "Service"),
+        status: String(row.status ?? row.Status ?? ""),
+      };
+    })
+    .filter((row): row is AppointmentRow => row !== null);
+}
+
+function parseVehicles(raw: unknown): VehicleRow[] {
+  if (!Array.isArray(raw)) return [];
+  return raw
+    .map((item) => {
+      if (!item || typeof item !== "object") return null;
+      const row = item as Record<string, unknown>;
+      return {
+        year: Number(row.year ?? row.Year ?? 0),
+        make: String(row.make ?? row.Make ?? ""),
+        model: String(row.model ?? row.Model ?? ""),
+        vehicleNumber: String(row.vehicleNumber ?? row.VehicleNumber ?? ""),
+      };
+    })
+    .filter((row): row is VehicleRow => row !== null);
+}
+
+function formatVehicleLabel(vehicle: VehicleRow) {
+  const label = [vehicle.year, vehicle.make, vehicle.model].filter(Boolean).join(" ");
+  return vehicle.vehicleNumber ? `${label} · ${vehicle.vehicleNumber}` : label || "Vehicle";
+}
+
+function isUpcomingAppointment(appointment: AppointmentRow, now: number) {
+  const status = appointment.status.trim().toLowerCase();
+  if (status !== "pending" && status !== "confirmed") return false;
+  const when = new Date(appointment.appointmentDate).getTime();
+  return !Number.isNaN(when) && when >= now;
+}
+
+function buildSummary(
+  profile: Record<string, unknown>,
+  vehicles: VehicleRow[],
+  appointments: AppointmentRow[],
+  history: Record<string, unknown>,
+): DashboardSummary {
   const now = Date.now();
-  return raw.filter((item) => {
-    if (!item || typeof item !== "object") return false;
-    const row = item as Record<string, unknown>;
-    const dateRaw = row.appointmentDate ?? row.AppointmentDate;
-    const status = String(row.status ?? row.Status ?? "").toLowerCase();
-    if (status !== "pending" && status !== "confirmed") return false;
-    const when = new Date(String(dateRaw));
-    return !Number.isNaN(when.getTime()) && when.getTime() >= now;
-  }).length;
+  const upcoming = appointments
+    .filter((a) => isUpcomingAppointment(a, now))
+    .sort((a, b) => new Date(a.appointmentDate).getTime() - new Date(b.appointmentDate).getTime());
+
+  const rawInvoices = Array.isArray(history.invoices) ? history.invoices : [];
+  let pendingCredit = 0;
+  for (const row of rawInvoices) {
+    if (!row || typeof row !== "object") continue;
+    const inv = row as Record<string, unknown>;
+    pendingCredit += Math.max(0, Number(inv.pendingCredit ?? inv.PendingCredit ?? 0));
+  }
+
+  return {
+    fullName: String(profile.fullName ?? profile.FullName ?? profile.name ?? "Customer"),
+    vehicleCount: vehicles.length,
+    primaryVehicleLabel: vehicles[0] ? formatVehicleLabel(vehicles[0]) : null,
+    upcomingCount: upcoming.length,
+    nextAppointment: upcoming[0] ?? null,
+    purchaseCount: rawInvoices.length,
+    pendingCredit,
+  };
 }
 
 export default function CustomerDashboardPage() {
-  const [data, setData] = useState<CustomerSummary | null>(null);
+  const [data, setData] = useState<DashboardSummary | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
@@ -65,19 +146,14 @@ export default function CustomerDashboardPage() {
           ? (profileBody as Record<string, unknown>)
           : {};
 
-      const vehicles = Array.isArray(vehiclesBody) ? vehiclesBody : [];
       const history =
         historyBody && typeof historyBody === "object" && !Array.isArray(historyBody)
           ? (historyBody as Record<string, unknown>)
           : {};
-      const invoices = Array.isArray(history.invoices) ? history.invoices : [];
 
-      setData({
-        fullName: String(profile.fullName ?? profile.name ?? "Customer"),
-        vehicleCount: vehicles.length,
-        upcomingAppointments: countUpcomingAppointments(appointmentsBody),
-        purchaseCount: invoices.length,
-      });
+      setData(
+        buildSummary(profile, parseVehicles(vehiclesBody), parseAppointments(appointmentsBody), history),
+      );
     } catch {
       setData(null);
       setError("Network error while loading dashboard.");
@@ -95,20 +171,31 @@ export default function CustomerDashboardPage() {
       {
         label: "Vehicles",
         value: String(data?.vehicleCount ?? 0),
+        hint: data?.primaryVehicleLabel ?? undefined,
         href: "/customer/profile",
-        hrefLabel: "Manage profile",
+        hrefLabel: "Profile",
       },
       {
         label: "Upcoming visits",
-        value: String(data?.upcomingAppointments ?? 0),
+        value: String(data?.upcomingCount ?? 0),
+        hint: data?.nextAppointment
+          ? `${data.nextAppointment.serviceType} — ${formatNepalDateTime(data.nextAppointment.appointmentDate)}`
+          : undefined,
         href: "/customer/appointments",
-        hrefLabel: "Book or view",
+        hrefLabel: "Appointments",
       },
       {
         label: "Purchases",
         value: String(data?.purchaseCount ?? 0),
         href: "/customer/history",
-        hrefLabel: "View history",
+        hrefLabel: "History",
+      },
+      {
+        label: "Balance due",
+        value: formatNpr(data?.pendingCredit ?? 0),
+        alert: (data?.pendingCredit ?? 0) > 0,
+        href: "/customer/history",
+        hrefLabel: "Invoices",
       },
     ],
     [data],
@@ -116,9 +203,11 @@ export default function CustomerDashboardPage() {
 
   const actions: DashboardAction[] = [
     { href: "/customer/appointments", label: "Book appointment", primary: true },
-    { href: "/customer/about", label: "About service center" },
     { href: "/customer/part-requests", label: "Request a part" },
-    { href: "/customer/profile", label: "My profile" },
+    { href: "/customer/history", label: "History" },
+    { href: "/customer/reviews", label: "Reviews" },
+    { href: "/customer/profile", label: "Profile" },
+    { href: "/customer/about", label: "About" },
   ];
 
   const greeting = data?.fullName ? (
@@ -128,7 +217,7 @@ export default function CustomerDashboardPage() {
   return (
     <RoleDashboard
       title="My dashboard"
-      subtitle="Your vehicles, visits, and purchases at a glance."
+      subtitle="Your vehicles, visits, and purchases."
       kpis={kpis}
       actions={actions}
       loading={loading}

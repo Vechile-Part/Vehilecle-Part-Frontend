@@ -21,6 +21,7 @@ import {
   MdHistory,
   MdAssignment,
   MdInfoOutline,
+  MdEmail,
 } from "react-icons/md";
 import { FaUserFriends } from "react-icons/fa";
 import AdminNotificationBell from "./AdminNotificationBell";
@@ -108,34 +109,6 @@ const MAIN_NAV: NavItem[] = [
     Icon: MdCalendarToday,
   },
   {
-    href: "/staff/dashboard",
-    label: "Dashboard",
-    match: ["/staff/dashboard"],
-    roles: ["staff"],
-    Icon: MdBarChart,
-  },
-  {
-    href: "/staff/customers",
-    label: "Customers",
-    match: ["/staff/customers"],
-    roles: ["staff"],
-    Icon: FaUserFriends,
-  },
-  {
-    href: "/staff/reports",
-    label: "Customer reports",
-    match: ["/staff/reports"],
-    roles: ["staff"],
-    Icon: MdBarChart,
-  },
-  {
-    href: "/staff/register",
-    label: "Register customer",
-    match: ["/staff/register"],
-    roles: ["staff"],
-    Icon: MdAssignment,
-  },
-  {
     href: "/reporting",
     label: "Financial reporting",
     match: ["/reporting", "/reports"],
@@ -207,6 +180,67 @@ const MAIN_NAV: NavItem[] = [
   },
 ];
 
+/** Staff menu order — compact sidebar, no duplicate dashboard entries */
+const STAFF_NAV: NavItem[] = [
+  {
+    href: "/staff/dashboard",
+    label: "Dashboard",
+    match: ["/staff/dashboard"],
+    roles: ["staff"],
+    Icon: MdBarChart,
+  },
+  { href: "/pos", label: "Sales & POS", match: ["/pos"], roles: ["staff"], Icon: MdPointOfSale },
+  {
+    href: "/staff/invoices",
+    label: "Sales invoices",
+    match: ["/staff/invoices"],
+    roles: ["staff"],
+    Icon: MdReceiptLong,
+  },
+  {
+    href: "/staff/customers",
+    label: "Customers",
+    match: ["/staff/customers"],
+    roles: ["staff"],
+    Icon: FaUserFriends,
+  },
+  {
+    href: "/staff/appointments",
+    label: "Appointments",
+    match: ["/staff/appointments"],
+    roles: ["staff"],
+    Icon: MdCalendarToday,
+  },
+  {
+    href: "/staff/reports",
+    label: "Reports",
+    match: ["/staff/reports"],
+    roles: ["staff"],
+    Icon: MdBarChart,
+  },
+  {
+    href: "/staff/customers",
+    label: "Customer search",
+    match: ["/staff/customers"],
+    roles: ["staff"],
+    Icon: MdSearch,
+  },
+  {
+    href: "/staff/invoices",
+    label: "Email invoices",
+    match: ["/staff/invoices"],
+    roles: ["staff"],
+    Icon: MdEmail,
+  },
+  {
+    href: "/logout",
+    label: "Logout",
+    match: ["/logout"],
+    roles: ["staff"],
+    Icon: MdLogout,
+  },
+];
+
 function pathMatches(pathname: string, segments: string[]): boolean {
   return segments.some((p) => pathname === p || pathname.startsWith(`${p}/`));
 }
@@ -222,6 +256,7 @@ function Sidebar() {
 
   const visibleNav = useMemo(() => {
     if (!shellRole) return [];
+    if (shellRole === "staff") return STAFF_NAV;
     return MAIN_NAV.filter((item) => item.roles.includes(shellRole));
   }, [shellRole]);
 
@@ -256,12 +291,14 @@ function Sidebar() {
       return;
     }
     if (shellRole === "staff") {
-      router.push(`/pos?${params.toString()}`);
+      router.push(`/staff/customers?${params.toString()}`);
     }
   };
 
+  const isStaffShell = shellRole === "staff";
+
   return (
-    <aside className="sidebar customer-portal-sidebar">
+    <aside className={`sidebar customer-portal-sidebar${isStaffShell ? " sidebar--staff" : ""}`}>
       <Link href={roleHomeHref(shellRole)} className="sidebar-product-brand">
         <Image
           src="/assets/log.png"
@@ -295,7 +332,7 @@ function Sidebar() {
         </div>
       </div>
 
-      {shellRole !== "customer" && (
+      {shellRole !== "customer" && !isStaffShell && (
         <div className="sidebar-search-block">
           <label className="sidebar-search-label" htmlFor="sidebar-quick-search">
             Quick search
@@ -321,22 +358,20 @@ function Sidebar() {
         </div>
       )}
 
-      <div className="sidebar-toolbar" aria-label="Account shortcuts">
-        {shellRole === "admin" ? (
-          <AdminNotificationBell />
-        ) : shellRole === "staff" ? (
-          <Link href="/staff/appointments" className="sidebar-icon-btn" aria-label="Appointments">
-            <MdNotificationsNone size={20} />
+      {!isStaffShell && (
+        <div className="sidebar-toolbar" aria-label="Account shortcuts">
+          {shellRole === "admin" ? (
+            <AdminNotificationBell />
+          ) : (
+            <button type="button" className="sidebar-icon-btn" aria-label="Notifications" disabled>
+              <MdNotificationsNone size={20} />
+            </button>
+          )}
+          <Link href={accountHref} className="sidebar-icon-btn" aria-label="Account">
+            <MdPersonOutline size={20} />
           </Link>
-        ) : (
-          <button type="button" className="sidebar-icon-btn" aria-label="Notifications" disabled>
-            <MdNotificationsNone size={20} />
-          </button>
-        )}
-        <Link href={accountHref} className="sidebar-icon-btn" aria-label="Account">
-          <MdPersonOutline size={20} />
-        </Link>
-      </div>
+        </div>
+      )}
 
       <p className="sidebar-nav-heading">{shellRole === "customer" ? "Your menu" : "Menu"}</p>
       <nav className="sidebar-nav" aria-label="Main">
@@ -357,20 +392,22 @@ function Sidebar() {
         )}
       </nav>
 
-      <div className="sidebar-bottom">
-        {shellRole !== "customer" && (
-          <Link href="/pos" className="sidebar-new-sale">
-            <MdPointOfSale size={18} aria-hidden />
-            New Sale
+      {!isStaffShell && (
+        <div className="sidebar-bottom">
+          {shellRole !== "customer" && (
+            <Link href="/pos" className="sidebar-new-sale">
+              <MdPointOfSale size={18} aria-hidden />
+              New Sale
+            </Link>
+          )}
+          <Link href="/help" className={`sidebar-item${pathname === "/help" ? " active" : ""}`}>
+            <MdHelp size={18} /> Help Center
           </Link>
-        )}
-        <Link href="/help" className={`sidebar-item${pathname === "/help" ? " active" : ""}`}>
-          <MdHelp size={18} /> Help Center
-        </Link>
-        <Link href="/logout" className="sidebar-item sidebar-logout">
-          <MdLogout size={18} /> Logout
-        </Link>
-      </div>
+          <Link href="/logout" className="sidebar-item sidebar-logout">
+            <MdLogout size={18} /> Logout
+          </Link>
+        </div>
+      )}
     </aside>
   );
 }
