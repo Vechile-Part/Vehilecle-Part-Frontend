@@ -64,8 +64,13 @@ export default function ReportingPage() {
   const load = useCallback(async () => {
     setLoading(true);
     setError("");
+    const controller = new AbortController();
+    const timeoutId = window.setTimeout(() => controller.abort(), 45_000);
     try {
-      const res = await apiFetch(`/api/admin/financial-dashboard/${period}`);
+      const res = await apiFetch(`/api/admin/financial-dashboard/${period}`, {
+        signal: controller.signal,
+        cache: "no-store",
+      });
       const body = await parseJsonSafe(res);
       if (res.status === 401 || res.status === 403) {
         setData(null);
@@ -93,10 +98,17 @@ export default function ReportingPage() {
         pendingInvoiceCount: Number(d.pendingInvoiceCount ?? d.PendingInvoiceCount ?? 0),
         totalPendingCredits: Number(d.totalPendingCredits ?? d.TotalPendingCredits ?? 0),
       });
-    } catch {
+    } catch (err) {
       setData(null);
-      setError("Network error while loading reports.");
+      if (err instanceof Error && err.name === "AbortError") {
+        setError(
+          "Request timed out. Check that the backend is running on port 5020, then click Refresh or switch period again.",
+        );
+      } else {
+        setError("Network error while loading reports. Is the backend running?");
+      }
     } finally {
+      window.clearTimeout(timeoutId);
       setLoading(false);
     }
   }, [period]);
